@@ -162,11 +162,11 @@ class _EmailRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: kBorder)),
+        decoration: BoxDecoration(
+          color: isUnread ? kSurface : kBackground,
+          border: const Border(bottom: BorderSide(color: kBorder)),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        color: isUnread ? kSurface : kBackground,
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           // Avatar
           Container(
