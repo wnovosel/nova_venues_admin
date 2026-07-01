@@ -15,16 +15,7 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> _restore() async {
     await api.restoreSession();
-    if (api.isAuthenticated) {
-      // Verify session is still valid
-      try {
-        await api.getMorningData();
-        _loggedIn = true;
-      } catch (e) {
-        _loggedIn = false;
-        await api.logout();
-      }
-    }
+    _loggedIn = api.isAuthenticated;
     _loading = false;
     notifyListeners();
   }
