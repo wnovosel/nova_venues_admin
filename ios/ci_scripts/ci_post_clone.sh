@@ -13,4 +13,4 @@ flutter precache --ios
 
 cd ios
 rm -rf Pods Podfile.lock .symlinks
-pod install --repo-update
+pod install
