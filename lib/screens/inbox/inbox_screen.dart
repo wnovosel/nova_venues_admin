@@ -204,44 +204,42 @@ class _InboxSettingsSheetState extends State<_InboxSettingsSheet> {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(24),
-      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Center(child: Container(width: 40, height: 4,
           decoration: BoxDecoration(color: kBorder, borderRadius: BorderRadius.circular(2)))),
         const SizedBox(height: 20),
         const Text('Swipe Actions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: kTextDark)),
         const SizedBox(height: 20),
 
+        const Text('Swipe Left  ←', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kError)),
+        const SizedBox(height: 6),
         _SwipeSelector(
-          label: '← Swipe Left',
-          color: kError,
           current: _s.swipeLeft,
           onChanged: (a) {
             setState(() => _s = _s.copyWith(swipeLeft: a));
             widget.onChanged(_s);
           },
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
+        const Text('→ Swipe Right', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kSuccess)),
+        const SizedBox(height: 6),
         _SwipeSelector(
-          label: '→ Swipe Right',
-          color: kSuccess,
           current: _s.swipeRight,
           onChanged: (a) {
             setState(() => _s = _s.copyWith(swipeRight: a));
             widget.onChanged(_s);
           },
         ),
-        const SizedBox(height: 32),
-      ]),
+        const SizedBox(height: 40),
+      ])),
     );
   }
 }
 
 class _SwipeSelector extends StatelessWidget {
-  final String label;
-  final Color color;
   final SwipeAction current;
   final ValueChanged<SwipeAction> onChanged;
-  const _SwipeSelector({required this.label, required this.color, required this.current, required this.onChanged});
+  const _SwipeSelector({required this.current, required this.onChanged});
 
   static const _options = [
     SwipeAction.archive,
@@ -264,16 +262,25 @@ class _SwipeSelector extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: color)),
       const SizedBox(height: 8),
-      Container(
-        decoration: cardDecoration(radius: 12),
-        child: Column(children: _options.map((a) => RadioListTile<SwipeAction>(
-          value: a,
-          groupValue: current,
-          onChanged: (v) => onChanged(v!),
-          activeColor: kPrimary,
-          title: Text(_labels[a]!, style: const TextStyle(fontSize: 15)),
-          dense: true,
-        )).toList()),
+      Material(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(12),
+        child: Column(children: _options.asMap().entries.map((entry) {
+          final i = entry.key;
+          final a = entry.value;
+          return Column(mainAxisSize: MainAxisSize.min, children: [
+            RadioListTile<SwipeAction>(
+              value: a,
+              groupValue: current,
+              onChanged: (v) => onChanged(v!),
+              activeColor: kPrimary,
+              title: Text(_labels[a]!, style: const TextStyle(fontSize: 15)),
+              dense: true,
+            ),
+            if (i < _options.length - 1)
+              const Divider(height: 1, indent: 16),
+          ]);
+        }).toList()),
       ),
     ]);
   }
@@ -339,42 +346,42 @@ class _EmailList extends StatelessWidget {
             )).then((_) => onRefresh()),
           );
 
-          // Left swipe
-          if (settings.swipeLeft != SwipeAction.none) {
-            tile = Dismissible(
-              key: ValueKey('left_$id'),
-              direction: DismissDirection.endToStart,
-              background: _SwipeBg(
-                action: settings.swipeLeft,
-                alignment: Alignment.centerRight,
-                color: _actionColors[settings.swipeLeft]!,
-                icon: _actionIcons[settings.swipeLeft]!,
-                label: _actionLabels[settings.swipeLeft]!,
-              ),
-              confirmDismiss: (_) async {
-                if (settings.swipeLeft == SwipeAction.none) return false;
-                onSwipe(settings.swipeLeft, e);
-                return settings.swipeLeft == SwipeAction.archive || settings.swipeLeft == SwipeAction.delete;
-              },
-              child: tile,
-            );
-          }
+          // Combined swipe — single Dismissible handles both directions
+          final hasLeft  = settings.swipeLeft  != SwipeAction.none;
+          final hasRight = settings.swipeRight != SwipeAction.none;
+          if (hasLeft || hasRight) {
+            DismissDirection dir;
+            if (hasLeft && hasRight) dir = DismissDirection.horizontal;
+            else if (hasLeft)        dir = DismissDirection.endToStart;
+            else                     dir = DismissDirection.startToEnd;
 
-          // Right swipe
-          if (settings.swipeRight != SwipeAction.none) {
             tile = Dismissible(
-              key: ValueKey('right_$id'),
-              direction: DismissDirection.startToEnd,
-              background: _SwipeBg(
+              key: ValueKey('swipe_$id'),
+              direction: dir,
+              // right swipe background (startToEnd)
+              background: hasRight ? _SwipeBg(
                 action: settings.swipeRight,
                 alignment: Alignment.centerLeft,
                 color: _actionColors[settings.swipeRight]!,
                 icon: _actionIcons[settings.swipeRight]!,
                 label: _actionLabels[settings.swipeRight]!,
-              ),
-              confirmDismiss: (_) async {
-                onSwipe(settings.swipeRight, e);
-                return false; // don't dismiss for read/unread
+              ) : const SizedBox.shrink(),
+              // left swipe background (endToStart)
+              secondaryBackground: hasLeft ? _SwipeBg(
+                action: settings.swipeLeft,
+                alignment: Alignment.centerRight,
+                color: _actionColors[settings.swipeLeft]!,
+                icon: _actionIcons[settings.swipeLeft]!,
+                label: _actionLabels[settings.swipeLeft]!,
+              ) : null,
+              confirmDismiss: (direction) async {
+                final action = direction == DismissDirection.startToEnd
+                    ? settings.swipeRight
+                    : settings.swipeLeft;
+                if (action == SwipeAction.none) return false;
+                onSwipe(action, e);
+                // Only actually dismiss for archive/delete
+                return action == SwipeAction.archive || action == SwipeAction.delete;
               },
               child: tile,
             );
