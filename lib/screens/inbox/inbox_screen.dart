@@ -260,8 +260,6 @@ class _SwipeSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: color)),
-      const SizedBox(height: 8),
       Material(
         color: kSurface,
         borderRadius: BorderRadius.circular(12),
