@@ -146,6 +146,25 @@ class AdminApiClient {
   Future<Map<String, dynamic>> approvePost(dynamic id) =>
       _post('/api/v1/admin/vendors/$id/status', {});
 
+
+  Future<Map<String, dynamic>> getEventDetail(int id) =>
+      _get('/api/v1/admin/events/$id');
+
+  Future<Map<String, dynamic>> cancelEvent(String id) =>
+      _post('/api/v1/admin/events/$id/cancel', {});
+
+  Future<Map<String, dynamic>> toggleSoldOut(String id) =>
+      _post('/api/v1/admin/events/$id/toggle-soldout', {});
+
+  Future<Map<String, dynamic>> togglePublish(String id) =>
+      _post('/api/v1/admin/events/$id/toggle-publish', {});
+
+  Future<Map<String, dynamic>> checkIn(int eventId, dynamic ticketId) =>
+      _post('/api/v1/admin/events/$eventId/attendees/$ticketId/checkin', {});
+
+  Future<Map<String, dynamic>> undoCheckin(int eventId, dynamic ticketId) =>
+      _post('/api/v1/admin/events/$eventId/attendees/$ticketId/undo-checkin', {});
+
   // ── HTTP plumbing ─────────────────────────────────────────────────────────
 
   Map<String, String> get _headers => {
