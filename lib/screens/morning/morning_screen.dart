@@ -10,7 +10,8 @@ class MorningScreen extends StatefulWidget {
 }
 
 class _MorningScreenState extends State<MorningScreen> {
-  Map<String, dynamic>? _data;
+  Map<String, dynamic> _brief = {};
+  Map<String, dynamic> _dashboard = {};
   bool _loading = true;
   String? _error;
 
@@ -21,8 +22,15 @@ class _MorningScreenState extends State<MorningScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final api = context.read<AppProvider>().api;
-      final res = await api.getMorningData();
-      setState(() { _data = res; _loading = false; });
+      final results = await Future.wait([
+        api.getMorningData(),
+        api.getDashboard(),
+      ]);
+      setState(() {
+        _brief = results[0];
+        _dashboard = results[1];
+        _loading = false;
+      });
     } catch (e) {
       setState(() { _error = e.toString(); _loading = false; });
     }
@@ -38,343 +46,407 @@ class _MorningScreenState extends State<MorningScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         color: kPrimary,
-        child: CustomScrollView(
-          slivers: [
-            SliverAppBar(
-              pinned: true,
-              backgroundColor: kSurface,
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(greeting, style: const TextStyle(fontSize: 13, color: kTextMuted, fontWeight: FontWeight.w400)),
-                  Text(DateFormat('EEEE, MMMM d').format(now),
-                      style: const TextStyle(fontSize: 17, color: kTextDark, fontWeight: FontWeight.w700)),
-                ],
-              ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh, color: kTextMuted),
-                  onPressed: _load,
-                ),
-              ],
-            ),
+        child: CustomScrollView(slivers: [
+          SliverAppBar(
+            pinned: true,
+            backgroundColor: kSurface,
+            title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(greeting, style: const TextStyle(fontSize: 12, color: kTextMuted, fontWeight: FontWeight.w400)),
+              Text(DateFormat('EEEE, MMMM d').format(now),
+                  style: const TextStyle(fontSize: 17, color: kTextDark, fontWeight: FontWeight.w700)),
+            ]),
+            actions: [
+              IconButton(icon: const Icon(Icons.refresh, color: kTextMuted), onPressed: _load),
+            ],
+          ),
 
-            if (_loading)
-              const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator(color: kPrimary)),
-              )
-            else if (_error != null)
-              SliverFillRemaining(
-                child: Center(child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline, color: kTextMuted, size: 48),
-                    const SizedBox(height: 12),
-                    Text(_error!, style: const TextStyle(color: kTextMuted)),
-                    const SizedBox(height: 16),
-                    ElevatedButton(onPressed: _load, child: const Text('Retry')),
-                  ],
-                )),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.all(16),
-                sliver: SliverList(delegate: SliverChildListDelegate([
-                  _SalesSection(data: _data?['sales']),
-                  const SizedBox(height: 16),
-                  _MoneySection(data: _data?['money']),
-                  const SizedBox(height: 16),
-                  _ResponsesSection(data: _data?['responses']),
-                  const SizedBox(height: 16),
-                  _SocialSection(data: _data?['social']),
-                  const SizedBox(height: 32),
-                ])),
-              ),
-          ],
-        ),
+          if (_loading)
+            const SliverFillRemaining(child: Center(child: CircularProgressIndicator(color: kPrimary)))
+          else if (_error != null)
+            SliverFillRemaining(child: Center(child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(_error!, style: const TextStyle(color: kTextMuted)),
+                ElevatedButton(onPressed: _load, child: const Text('Retry')),
+              ],
+            )))
+          else
+            SliverPadding(
+              padding: const EdgeInsets.all(16),
+              sliver: SliverList(delegate: SliverChildListDelegate([
+                // Sales strip
+                _SalesStrip(data: _brief['sales']),
+                const SizedBox(height: 12),
+
+                // Action items — the meat of the dashboard
+                _ActionSection(
+                  title: 'New Hire Requests',
+                  icon: Icons.person_add_outlined,
+                  color: kSuccess,
+                  items: (_dashboard['new_hires'] as List? ?? []).cast<Map<String,dynamic>>(),
+                  emptyText: 'No pending applications',
+                  builder: (item) => _HireCard(item: item, onRefresh: _load),
+                ),
+                const SizedBox(height: 12),
+
+                _ActionSection(
+                  title: 'Vendor Requests',
+                  icon: Icons.storefront_outlined,
+                  color: kWarning,
+                  items: (_dashboard['new_vendors'] as List? ?? []).cast<Map<String,dynamic>>(),
+                  emptyText: 'No pending vendor requests',
+                  builder: (item) => _VendorCard(item: item, onRefresh: _load),
+                ),
+                const SizedBox(height: 12),
+
+                _ActionSection(
+                  title: 'New Voicemails',
+                  icon: Icons.voicemail,
+                  color: kPrimary,
+                  items: (_dashboard['voicemails'] as List? ?? []).cast<Map<String,dynamic>>(),
+                  emptyText: 'No new voicemails',
+                  builder: (item) => _VoicemailCard(item: item, onRefresh: _load),
+                ),
+                const SizedBox(height: 12),
+
+                _ActionSection(
+                  title: 'Rental Requests',
+                  icon: Icons.home_work_outlined,
+                  color: Color(0xFF6B4FBB),
+                  items: (_dashboard['new_rentals'] as List? ?? []).cast<Map<String,dynamic>>(),
+                  emptyText: 'No pending rental requests',
+                  builder: (item) => _RentalCard(item: item, onRefresh: _load),
+                ),
+                const SizedBox(height: 12),
+
+                // Upcoming events
+                if ((_brief['upcoming_events'] as List? ?? []).isNotEmpty)
+                  _UpcomingEvents(events: (_brief['upcoming_events'] as List).cast<Map<String,dynamic>>()),
+
+                const SizedBox(height: 32),
+              ])),
+            ),
+        ]),
       ),
     );
   }
 }
 
-// ── Sales Section ─────────────────────────────────────────────────────────────
+// ── Sales strip ───────────────────────────────────────────────────────────────
 
-class _SalesSection extends StatelessWidget {
+class _SalesStrip extends StatelessWidget {
   final Map<String, dynamic>? data;
-  const _SalesSection({this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    if (data == null || data!['available'] != true) {
-      return _SectionCard(title: 'Yesterday\'s Sales', icon: Icons.point_of_sale,
-          child: const _Unavailable(message: 'Sales data unavailable'));
-    }
-    final gross = (data!['gross'] ?? 0).toDouble();
-    final count = data!['order_count'] ?? 0;
-    final topSellers = (data!['top_sellers'] as List? ?? []).cast<Map<String, dynamic>>();
-
-    return _SectionCard(
-      title: 'Yesterday\'s Sales',
-      icon: Icons.point_of_sale,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: _StatBox(
-            label: 'Revenue',
-            value: '\$${gross.toStringAsFixed(0)}',
-            color: kSuccess,
-          )),
-          const SizedBox(width: 12),
-          Expanded(child: _StatBox(
-            label: 'Orders',
-            value: '$count',
-            color: kPrimary,
-          )),
-        ]),
-        if (topSellers.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          const Text('Top Sellers', style: TextStyle(
-            fontWeight: FontWeight.w700, fontSize: 13, color: kTextMuted)),
-          const SizedBox(height: 8),
-          ...topSellers.map((s) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(children: [
-              Expanded(child: Text(s['name'] ?? '', style: const TextStyle(fontSize: 14, color: kTextDark))),
-              Text('${s['units']} sold', style: const TextStyle(fontSize: 12, color: kTextMuted)),
-              const SizedBox(width: 12),
-              Text('\$${(s['revenue'] ?? 0).toStringAsFixed(0)}',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kTextDark)),
-            ]),
-          )),
-        ],
-      ]),
-    );
-  }
-}
-
-// ── Money Section ─────────────────────────────────────────────────────────────
-
-class _MoneySection extends StatelessWidget {
-  final Map<String, dynamic>? data;
-  const _MoneySection({this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    if (data == null || data!['available'] != true) {
-      return _SectionCard(title: 'This Month', icon: Icons.account_balance_wallet,
-          child: const _Unavailable(message: 'Financial data unavailable'));
-    }
-    final revenue  = (data!['revenue_mtd']  ?? 0).toDouble();
-    final expenses = (data!['expenses_mtd'] ?? 0).toDouble();
-    final profit   = (data!['profit_mtd']   ?? 0).toDouble();
-    final margin   = (data!['margin_pct']   ?? 0).toDouble();
-    final bills    = (data!['upcoming_bills'] as List? ?? []).cast<Map<String, dynamic>>();
-
-    return _SectionCard(
-      title: 'This Month',
-      icon: Icons.account_balance_wallet,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: _StatBox(label: 'Revenue', value: '\$${revenue.toStringAsFixed(0)}', color: kSuccess)),
-          const SizedBox(width: 8),
-          Expanded(child: _StatBox(label: 'Expenses', value: '\$${expenses.toStringAsFixed(0)}', color: kWarning)),
-          const SizedBox(width: 8),
-          Expanded(child: _StatBox(label: 'Profit', value: '\$${profit.toStringAsFixed(0)}', color: profit >= 0 ? kSuccess : kError)),
-        ]),
-        const SizedBox(height: 8),
-        Text('Margin: ${margin.toStringAsFixed(1)}%',
-            style: const TextStyle(fontSize: 12, color: kTextMuted)),
-        if (bills.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          const Text('Upcoming Bills', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: kTextMuted)),
-          const SizedBox(height: 8),
-          ...bills.take(3).map((b) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(children: [
-              Expanded(child: Text(b['vendor'] ?? '', style: const TextStyle(fontSize: 14))),
-              Text(b['due_date'] ?? '', style: const TextStyle(fontSize: 12, color: kTextMuted)),
-              const SizedBox(width: 12),
-              Text('\$${(b['amount'] ?? 0).toStringAsFixed(0)}',
-                  style: const TextStyle(fontWeight: FontWeight.w700, color: kWarning)),
-            ]),
-          )),
-        ],
-      ]),
-    );
-  }
-}
-
-// ── Responses Section ─────────────────────────────────────────────────────────
-
-class _ResponsesSection extends StatelessWidget {
-  final Map<String, dynamic>? data;
-  const _ResponsesSection({this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    final calls = (data?['calls'] as List? ?? []).cast<Map<String, dynamic>>();
-    final emails = (data?['needs_reply'] as List? ?? []).cast<Map<String, dynamic>>();
-
-    return _SectionCard(
-      title: 'Needs Attention',
-      icon: Icons.inbox,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        if (calls.isEmpty && emails.isEmpty)
-          const Text('All caught up! 🎉', style: TextStyle(color: kTextMuted, fontSize: 14)),
-
-        if (calls.isNotEmpty) ...[
-          const Text('Recent Calls', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: kTextMuted)),
-          const SizedBox(height: 8),
-          ...calls.map((c) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: kPrimary.withOpacity(0.1), shape: BoxShape.circle),
-                child: const Icon(Icons.phone, size: 16, color: kPrimary),
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(c['caller'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                if (c['summary'] != null)
-                  Text(c['summary'], style: const TextStyle(fontSize: 12, color: kTextMuted), maxLines: 2, overflow: TextOverflow.ellipsis),
-              ])),
-            ]),
-          )),
-        ],
-
-        if (emails.isNotEmpty) ...[
-          if (calls.isNotEmpty) const SizedBox(height: 12),
-          const Text('Email', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: kTextMuted)),
-          const SizedBox(height: 8),
-          ...emails.take(3).map((e) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: kWarning.withOpacity(0.1), shape: BoxShape.circle),
-                child: const Icon(Icons.mail_outline, size: 16, color: kWarning),
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(e['from'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                Text(e['subject'] ?? '', style: const TextStyle(fontSize: 12, color: kTextMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
-              ])),
-            ]),
-          )),
-        ],
-      ]),
-    );
-  }
-}
-
-// ── Social Section ────────────────────────────────────────────────────────────
-
-class _SocialSection extends StatelessWidget {
-  final Map<String, dynamic>? data;
-  const _SocialSection({this.data});
+  const _SalesStrip({this.data});
 
   @override
   Widget build(BuildContext context) {
     if (data == null || data!['available'] != true) return const SizedBox.shrink();
-    final posts = (data!['posts'] as List? ?? []).cast<Map<String, dynamic>>();
-    if (posts.isEmpty) return const SizedBox.shrink();
+    final gross = (data!['gross'] ?? 0).toDouble();
+    final count = data!['order_count'] ?? 0;
 
-    return _SectionCard(
-      title: 'Marketing Queue',
-      icon: Icons.campaign,
-      child: Column(children: posts.take(3).map((p) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Row(children: [
-          _StatusChip(p['status'] ?? ''),
-          const SizedBox(width: 10),
-          Expanded(child: Text(p['copy'] ?? '', style: const TextStyle(fontSize: 13), maxLines: 2, overflow: TextOverflow.ellipsis)),
-        ]),
-      )).toList()),
+    return Container(
+      decoration: cardDecoration(),
+      padding: const EdgeInsets.all(16),
+      child: Row(children: [
+        Expanded(child: _Mini(label: "Yesterday's Revenue",
+            value: '\$${gross.toStringAsFixed(0)}', color: kSuccess)),
+        Container(width: 1, height: 40, color: kBorder),
+        Expanded(child: _Mini(label: 'Orders', value: '$count', color: kPrimary)),
+        Container(width: 1, height: 40, color: kBorder),
+        Expanded(child: _Mini(label: 'Avg Order',
+            value: count > 0 ? '\$${(gross/count).toStringAsFixed(0)}' : '-', color: kTextMuted)),
+      ]),
     );
   }
 }
 
-// ── Shared widgets ────────────────────────────────────────────────────────────
+class _Mini extends StatelessWidget {
+  final String label, value;
+  final Color color;
+  const _Mini({required this.label, required this.value, required this.color});
+  @override
+  Widget build(BuildContext context) => Column(children: [
+    Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color)),
+    const SizedBox(height: 2),
+    Text(label, style: const TextStyle(fontSize: 10, color: kTextMuted), textAlign: TextAlign.center),
+  ]);
+}
 
-class _SectionCard extends StatelessWidget {
-  final String title;
+// ── Action section ────────────────────────────────────────────────────────────
+
+class _ActionSection extends StatelessWidget {
+  final String title, emptyText;
   final IconData icon;
-  final Widget child;
-  const _SectionCard({required this.title, required this.icon, required this.child});
+  final Color color;
+  final List<Map<String, dynamic>> items;
+  final Widget Function(Map<String, dynamic>) builder;
+
+  const _ActionSection({
+    required this.title, required this.icon, required this.color,
+    required this.items, required this.emptyText, required this.builder,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: cardDecoration(),
-      padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Icon(icon, size: 18, color: kPrimary),
-          const SizedBox(width: 8),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: kTextDark)),
-        ]),
-        const SizedBox(height: 16),
-        child,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+          child: Row(children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 8),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: kTextDark)),
+            const Spacer(),
+            if (items.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+                child: Text('${items.length}', style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w700)),
+              ),
+          ]),
+        ),
+        if (items.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            child: Text(emptyText, style: const TextStyle(fontSize: 13, color: kTextMuted)),
+          )
+        else
+          ...items.map((item) => Column(children: [
+            const Divider(height: 1, indent: 16),
+            builder(item),
+          ])),
       ]),
     );
   }
 }
 
-class _StatBox extends StatelessWidget {
-  final String label, value;
-  final Color color;
-  const _StatBox({required this.label, required this.value, required this.color});
+// ── Hire card ─────────────────────────────────────────────────────────────────
+
+class _HireCard extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final VoidCallback onRefresh;
+  const _HireCard({required this.item, required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(children: [
+        CircleAvatar(backgroundColor: kSuccess.withOpacity(0.1), radius: 18,
+          child: Text((item['name'] ?? '?')[0].toUpperCase(),
+              style: const TextStyle(color: kSuccess, fontWeight: FontWeight.w700))),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(item['name'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          if (item['position'] != null)
+            Text(item['position'], style: const TextStyle(fontSize: 12, color: kTextMuted)),
+        ])),
+        _ActionButtons(
+          onApprove: () => _updateStatus(context, 'approved'),
+          onDecline: () => _updateStatus(context, 'rejected'),
+          approveLabel: 'Interview',
+          declineLabel: 'Pass',
+        ),
+      ]),
+    );
+  }
+
+  Future<void> _updateStatus(BuildContext context, String status) async {
+    await context.read<AppProvider>().api.updateHireStatus(item['id'], status);
+    onRefresh();
+  }
+}
+
+// ── Vendor card ───────────────────────────────────────────────────────────────
+
+class _VendorCard extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final VoidCallback onRefresh;
+  const _VendorCard({required this.item, required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(children: [
+        Container(width: 36, height: 36,
+          decoration: BoxDecoration(color: kWarning.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+          child: const Icon(Icons.storefront, color: kWarning, size: 18)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(item['business_name'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          if (item['contact_name'] != null)
+            Text(item['contact_name'], style: const TextStyle(fontSize: 12, color: kTextMuted)),
+        ])),
+        _ActionButtons(
+          onApprove: () => _updateStatus(context, 'approved'),
+          onDecline: () => _updateStatus(context, 'rejected'),
+        ),
+      ]),
+    );
+  }
+
+  Future<void> _updateStatus(BuildContext context, String status) async {
+    await context.read<AppProvider>().api.updateVendorStatus(item['id'], status);
+    onRefresh();
+  }
+}
+
+// ── Voicemail card ────────────────────────────────────────────────────────────
+
+class _VoicemailCard extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final VoidCallback onRefresh;
+  const _VoicemailCard({required this.item, required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    final durSecs = item['duration_seconds'] as int?;
+    final duration = durSecs != null ? '${durSecs ~/ 60}:${(durSecs % 60).toString().padLeft(2,'0')}' : '';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(children: [
+        Container(width: 36, height: 36,
+          decoration: BoxDecoration(color: kPrimary.withOpacity(0.1), shape: BoxShape.circle),
+          child: const Icon(Icons.voicemail, color: kPrimary, size: 18)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(item['caller_name'] ?? item['from_number'] ?? 'Unknown',
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          if (item['summary'] != null)
+            Text(item['summary'], style: const TextStyle(fontSize: 12, color: kTextMuted),
+                maxLines: 1, overflow: TextOverflow.ellipsis),
+          if (duration.isNotEmpty)
+            Text(duration, style: const TextStyle(fontSize: 11, color: kTextMuted)),
+        ])),
+        TextButton(
+          onPressed: () => _markHandled(context),
+          child: const Text('Done', style: TextStyle(color: kPrimary, fontWeight: FontWeight.w700)),
+        ),
+      ]),
+    );
+  }
+
+  Future<void> _markHandled(BuildContext context) async {
+    await context.read<AppProvider>().api.markVoicemailHandled(item['id']);
+    onRefresh();
+  }
+}
+
+// ── Rental card ───────────────────────────────────────────────────────────────
+
+class _RentalCard extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final VoidCallback onRefresh;
+  const _RentalCard({required this.item, required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(children: [
+        Container(width: 36, height: 36,
+          decoration: BoxDecoration(color: const Color(0xFF6B4FBB).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+          child: const Icon(Icons.home_work, color: Color(0xFF6B4FBB), size: 18)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(item['contact_name'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          Text('${item['event_type'] ?? ''} · ${item['guest_count'] ?? '?'} guests',
+              style: const TextStyle(fontSize: 12, color: kTextMuted)),
+          if (item['event_date'] != null)
+            Text(_formatDate(item['event_date']), style: const TextStyle(fontSize: 11, color: kTextMuted)),
+        ])),
+        _ActionButtons(
+          onApprove: () => _confirm(context),
+          onDecline: () => _decline(context),
+        ),
+      ]),
+    );
+  }
+
+  Future<void> _confirm(BuildContext context) async {
+    await context.read<AppProvider>().api.confirmRental(item['id']);
+    onRefresh();
+  }
+
+  Future<void> _decline(BuildContext context) async {
+    await context.read<AppProvider>().api.declineRental(item['id']);
+    onRefresh();
+  }
+}
+
+// ── Upcoming events ───────────────────────────────────────────────────────────
+
+class _UpcomingEvents extends StatelessWidget {
+  final List<Map<String, dynamic>> events;
+  const _UpcomingEvents({required this.events});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-      decoration: statCardDecoration(color),
+      decoration: cardDecoration(),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 4),
-        Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: color)),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 14, 16, 10),
+          child: Row(children: [
+            Icon(Icons.event, size: 16, color: kPrimary),
+            SizedBox(width: 8),
+            Text('This Week', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+          ]),
+        ),
+        ...events.map((e) => Column(children: [
+          const Divider(height: 1, indent: 16),
+          ListTile(
+            dense: true,
+            title: Text(e['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            subtitle: e['starts_at'] != null
+                ? Text(_formatDate(e['starts_at']), style: const TextStyle(fontSize: 12, color: kTextMuted))
+                : null,
+            trailing: const Icon(Icons.chevron_right, color: kBorder, size: 18),
+          ),
+        ])),
       ]),
     );
   }
 }
 
-class _StatusChip extends StatelessWidget {
-  final String status;
-  const _StatusChip(this.status);
+// ── Shared ────────────────────────────────────────────────────────────────────
 
-  Color get _color => switch (status) {
-    'needs_review' => kWarning,
-    'approved'     => kSuccess,
-    'scheduled'    => kPrimary,
-    _              => kTextMuted,
-  };
+class _ActionButtons extends StatelessWidget {
+  final VoidCallback onApprove, onDecline;
+  final String approveLabel, declineLabel;
+  const _ActionButtons({
+    required this.onApprove, required this.onDecline,
+    this.approveLabel = 'Approve', this.declineLabel = 'Decline',
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: _color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _color.withOpacity(0.3)),
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      TextButton(
+        onPressed: onDecline,
+        style: TextButton.styleFrom(foregroundColor: kError, padding: const EdgeInsets.symmetric(horizontal: 8)),
+        child: Text(declineLabel, style: const TextStyle(fontSize: 12)),
       ),
-      child: Text(status.replaceAll('_', ' '),
-          style: TextStyle(fontSize: 11, color: _color, fontWeight: FontWeight.w600)),
-    );
-  }
-}
-
-class _Unavailable extends StatelessWidget {
-  final String message;
-  const _Unavailable({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(children: [
-      const Icon(Icons.info_outline, size: 16, color: kTextMuted),
-      const SizedBox(width: 8),
-      Text(message, style: const TextStyle(color: kTextMuted, fontSize: 13)),
+      ElevatedButton(
+        onPressed: onApprove,
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          minimumSize: Size.zero,
+          textStyle: const TextStyle(fontSize: 12),
+        ),
+        child: Text(approveLabel),
+      ),
     ]);
   }
+}
+
+String _formatDate(dynamic val) {
+  if (val == null) return '';
+  try {
+    final dt = DateTime.parse(val.toString()).toLocal();
+    return DateFormat('MMM d').format(dt);
+  } catch (_) { return val.toString(); }
 }

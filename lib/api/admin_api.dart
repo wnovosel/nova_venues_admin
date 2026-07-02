@@ -111,6 +111,41 @@ class AdminApiClient {
   Future<Map<String, dynamic>> getMarketingQueue() =>
       _get('/api/v1/nova-admin/brief');
 
+
+  // ── Dashboard ────────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getDashboard() =>
+      _get('/api/v1/nova-admin/dashboard');
+
+  Future<Map<String, dynamic>> markVoicemailHandled(dynamic id) =>
+      _post('/api/v1/nova-admin/dashboard/voicemail/$id/handled', {});
+
+  Future<Map<String, dynamic>> updateHireStatus(dynamic id, String status) =>
+      _post('/api/v1/nova-admin/dashboard/hire/$id/status', {'status': status});
+
+  Future<Map<String, dynamic>> updateVendorStatus(dynamic id, String status) =>
+      _post('/api/v1/nova-admin/dashboard/vendor/$id/status', {'status': status});
+
+  // ── Marketing snap ────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getR2UploadUrl() =>
+      _get('/api/v1/nova-admin/marketing/r2-upload-url');
+
+  Future<Map<String, dynamic>> snapPost(String imageUrl, String platform, String action) =>
+      _post('/api/v1/nova-admin/marketing/snap-post',
+          {'image_url': imageUrl, 'platform': platform, 'action': action});
+
+  Future<Map<String, dynamic>> snapArchive(String imageUrl) =>
+      _post('/api/v1/nova-admin/marketing/snap-archive', {'image_url': imageUrl});
+
+  Future<void> uploadToR2(String uploadUrl, List<int> bytes) async {
+    await http.put(Uri.parse(uploadUrl), body: bytes,
+        headers: {'Content-Type': 'image/jpeg'});
+  }
+
+  Future<Map<String, dynamic>> approvePost(dynamic id) =>
+      _post('/api/v1/nova-admin/marketing/$id/approve', {});
+
   // ── HTTP plumbing ─────────────────────────────────────────────────────────
 
   Map<String, String> get _headers => {
