@@ -37,15 +37,31 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
     }
   }
 
-  List<Map<String,dynamic>> get _upcoming => _all.where((e) {
-    try { return DateTime.parse(e['starts_at'].toString()).isAfter(DateTime.now().subtract(const Duration(hours: 6))); }
-    catch (_) { return true; }
-  }).toList();
+  List<Map<String,dynamic>> get _upcoming {
+    final list = _all.where((e) {
+      try { return DateTime.parse(e['starts_at'].toString()).isAfter(DateTime.now().subtract(const Duration(hours: 6))); }
+      catch (_) { return true; }
+    }).toList();
+    list.sort((a, b) {
+      try {
+        return DateTime.parse(a['starts_at'].toString()).compareTo(DateTime.parse(b['starts_at'].toString()));
+      } catch (_) { return 0; }
+    });
+    return list;
+  }
 
-  List<Map<String,dynamic>> get _past => _all.where((e) {
-    try { return DateTime.parse(e['starts_at'].toString()).isBefore(DateTime.now().subtract(const Duration(hours: 6))); }
-    catch (_) { return false; }
-  }).toList();
+  List<Map<String,dynamic>> get _past {
+    final list = _all.where((e) {
+      try { return DateTime.parse(e['starts_at'].toString()).isBefore(DateTime.now().subtract(const Duration(hours: 6))); }
+      catch (_) { return false; }
+    }).toList();
+    list.sort((a, b) {
+      try {
+        return DateTime.parse(b['starts_at'].toString()).compareTo(DateTime.parse(a['starts_at'].toString()));
+      } catch (_) { return 0; }
+    });
+    return list;
+  }
 
   @override
   Widget build(BuildContext context) {
