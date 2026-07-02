@@ -22,13 +22,18 @@ class _MorningScreenState extends State<MorningScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final api = context.read<AppProvider>().api;
-      final results = await Future.wait([
-        api.getMorningData(),
-        api.getDashboard(),
-      ]);
+      final brief = await api.getMorningData();
+      Map<String, dynamic> dashboard = {};
+      try {
+        dashboard = await api.getDashboard();
+      } catch (e) {
+        debugPrint('Dashboard error: $e');
+      }
+      debugPrint('Dashboard keys: ${dashboard.keys.toList()}');
+      debugPrint('New hires: ${dashboard['new_hires']}');
       setState(() {
-        _brief = results[0];
-        _dashboard = results[1];
+        _brief = brief;
+        _dashboard = dashboard;
         _loading = false;
       });
     } catch (e) {
