@@ -185,8 +185,9 @@ class AdminApiClient {
 
   Map<String, dynamic> _handle(http.Response res) {
     if (res.statusCode == 401) {
-      // Clear stored token so app returns to login screen
-      await logout();
+      _token = null;
+      _refreshToken = null;
+      _storage.deleteAll();
       throw const ApiException('Session expired. Please log in again.', statusCode: 401);
     }
     if (res.statusCode == 403) {
