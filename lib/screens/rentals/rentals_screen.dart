@@ -23,7 +23,7 @@ class _RentalsScreenState extends State<RentalsScreen> {
     try {
       final api = context.read<AppProvider>().api;
       final res = await api.getRentals();
-      final list = (res['inquiries'] ?? res['data']?['inquiries'] ?? []) as List;
+      final list = (res['rentals'] ?? res['inquiries'] ?? res['data']?['rentals'] ?? []) as List;
       setState(() { _rentals = list.cast<Map<String, dynamic>>(); _loading = false; });
     } catch (e) {
       setState(() { _error = e.toString(); _loading = false; });

@@ -24,7 +24,7 @@ class _MorningScreenState extends State<MorningScreen> {
       final api = context.read<AppProvider>().api;
       final results = await Future.wait([
         api.getMorningData(),
-        api.getDashboard(),
+        api.getMorningData(),
       ]);
       setState(() {
         _brief = results[0];
