@@ -67,10 +67,10 @@ class AdminApiClient {
   // ── Inbox ─────────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getInbox() =>
-      _get('/api/v1/admin/customers');
+      _get('/api/v1/admin-inbox');
 
   Future<Map<String, dynamic>> getEmailDetail(int id) =>
-      _get('/api/v1/admin/customers');
+      _get('/api/v1/admin-inbox');
 
   Future<Map<String, dynamic>> replyEmail(int id, String body) =>
       _post('/api/v1/admin/customers', {'body': body});
