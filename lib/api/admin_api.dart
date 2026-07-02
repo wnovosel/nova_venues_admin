@@ -62,54 +62,54 @@ class AdminApiClient {
   // ── Morning Brief ─────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getMorningData() =>
-      _get('/api/v1/admin/brief');
+      _get('/api/v1/nova-admin/brief');
 
   // ── Inbox ─────────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getInbox() =>
-      _get('/api/v1/admin/inbox');
+      _get('/api/v1/nova-admin/inbox');
 
   Future<Map<String, dynamic>> getEmailDetail(int id) =>
-      _get('/api/v1/admin/inbox/email/$id');
+      _get('/api/v1/nova-admin/inbox/email/$id');
 
   Future<Map<String, dynamic>> replyEmail(int id, String body) =>
-      _post('/api/v1/admin/inbox/email/$id/reply', {'body': body});
+      _post('/api/v1/nova-admin/inbox/email/$id/reply', {'body': body});
 
   Future<Map<String, dynamic>> composeEmail(String to, String subject, String body) =>
-      _post('/api/v1/admin/inbox/email/compose', {'to': to, 'subject': subject, 'body': body});
+      _post('/api/v1/nova-admin/inbox/email/compose', {'to': to, 'subject': subject, 'body': body});
 
   // ── Events ────────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getEvents() =>
-      _get('/api/v1/admin/events');
+      _get('/api/v1/nova-admin/events');
 
   Future<Map<String, dynamic>> getEventAttendees(int id) =>
-      _get('/api/v1/admin/events/$id/attendees');
+      _get('/api/v1/nova-admin/events/$id/attendees');
 
   Future<Map<String, dynamic>> cancelEvent(String id) =>
-      _post('/api/v1/admin/events/$id/status', {'status': 'cancelled'});
+      _post('/api/v1/nova-admin/events/$id/cancel', {});
 
   Future<Map<String, dynamic>> toggleSoldOut(String id) =>
-      _post('/api/v1/admin/events/$id/status', {'toggle_soldout': true});
+      _post('/api/v1/nova-admin/events/$id/toggle-soldout', {});
 
   // ── Rentals ───────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getRentals() =>
-      _get('/api/v1/admin/rentals');
+      _get('/api/v1/nova-admin/rentals');
 
   Future<Map<String, dynamic>> confirmRental(String id, Map<String, dynamic> data) =>
-      _post('/api/v1/admin/rentals/$id/status', {'status': 'confirmed'});
+      _post('/api/v1/nova-admin/rentals/$id/confirm', {'status': 'confirmed'});
 
   Future<Map<String, dynamic>> declineRental(String id) =>
-      _post('/api/v1/admin/rentals/$id/status', {'status': 'declined'});
+      _post('/api/v1/nova-admin/rentals/$id/decline', {});
 
   Future<Map<String, dynamic>> addRentalNote(String id, String note) =>
-      _post('/api/v1/admin/rentals/$id/status', {'note': note});
+      _post('/api/v1/nova-admin/rentals/$id/note', {'note': note});
 
   // ── Marketing ─────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getMarketingQueue() =>
-      _get('/api/v1/admin/brief');
+      _get('/api/v1/nova-admin/brief');
 
   // ── HTTP plumbing ─────────────────────────────────────────────────────────
 
