@@ -576,6 +576,21 @@ class _StatPill extends StatelessWidget {
 
 DateTime? _parseDate(dynamic val) {
   if (val == null) return null;
-  try { return DateTime.parse(val.toString()).toLocal(); }
-  catch (_) { return null; }
+  final s = val.toString();
+  // Try ISO first
+  try { return DateTime.parse(s).toLocal(); } catch (_) {}
+  // Try RFC 2822: "Sat, 13 Jun 2026 19:00:00 GMT"
+  try {
+    final months = {'Jan':1,'Feb':2,'Mar':3,'Apr':4,'May':5,'Jun':6,
+                    'Jul':7,'Aug':8,'Sep':9,'Oct':10,'Nov':11,'Dec':12};
+    final parts = s.replaceAll(',','').split(' ');
+    // parts: [day_name, day, mon, year, time, tz]
+    final day = int.parse(parts[1]);
+    final mon = months[parts[2]] ?? 1;
+    final year = int.parse(parts[3]);
+    final timeParts = parts[4].split(':');
+    final h = int.parse(timeParts[0]), m = int.parse(timeParts[1]), sec = int.parse(timeParts[2]);
+    return DateTime.utc(year, mon, day, h, m, sec).toLocal();
+  } catch (_) {}
+  return null;
 }
