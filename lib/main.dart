@@ -72,7 +72,13 @@ class _AdminShellState extends State<_AdminShell> {
       body: IndexedStack(index: _index, children: _screens),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _index,
-        onTap: (i) => setState(() => _index = i),
+        onTap: (i) {
+          if (i == 5) {
+            context.read<AppProvider>().forceLogout();
+            return;
+          }
+          setState(() => _index = i);
+        },
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.wb_sunny_outlined),
@@ -98,6 +104,11 @@ class _AdminShellState extends State<_AdminShell> {
             icon: Icon(Icons.campaign_outlined),
             activeIcon: Icon(Icons.campaign),
             label: 'Marketing',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.logout),
+            activeIcon: Icon(Icons.logout),
+            label: 'Sign Out',
           ),
         ],
       ),

@@ -20,6 +20,13 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void forceLogout() {
+    api.logout();
+    _loggedIn = false;
+    _error = null;
+    notifyListeners();
+  }
+
   Future<bool> login(String email, String password) async {
     _error = null;
     _loading = true;
