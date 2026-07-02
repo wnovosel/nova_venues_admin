@@ -229,14 +229,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> with SingleTicker
     setState(() => _loading = true);
     try {
       final api = context.read<AppProvider>().api;
-      final results = await Future.wait([
-        api.getEventDetail(widget.eventId),
-        api.getEventAttendees(widget.eventId),
-      ]);
+      final detail = await api.getEventDetail(widget.eventId);
+      final attendeeRes = await api.getEventAttendees(widget.eventId);
       setState(() {
-        _event = results[0]['event'] as Map<String,dynamic>?;
-        _tiers = (results[0]['tiers'] as List? ?? []).cast<Map<String,dynamic>>();
-        _attendees = (results[1]['attendees'] as List? ?? []).cast<Map<String,dynamic>>();
+        _event = detail['event'] as Map<String,dynamic>?;
+        _tiers = (detail['tiers'] as List? ?? []).cast<Map<String,dynamic>>();
+        _attendees = (attendeeRes['attendees'] as List? ?? []).cast<Map<String,dynamic>>();
         _loading = false;
       });
     } catch (e) {

@@ -138,6 +138,9 @@ class AdminApiClient {
       _post('/api/v1/admin/vendors/$id/status', {});
 
 
+  Future<Map<String, dynamic>> getEventAttendees(int id) =>
+      _get('/api/v1/admin/events/$id/attendees');
+
   Future<Map<String, dynamic>> getEventDetail(int id) =>
       _get('/api/v1/admin/events/$id');
 
