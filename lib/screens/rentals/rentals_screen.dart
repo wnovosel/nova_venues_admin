@@ -189,7 +189,7 @@ class _RentalCard extends StatelessWidget {
   }
 
   Future<void> _confirm(BuildContext context) async {
-    await context.read<AppProvider>().api.confirmRental(rental['id'].toString(), {});
+    await context.read<AppProvider>().api.confirmRental(rental['id'].toString());
     onRefresh();
   }
 
