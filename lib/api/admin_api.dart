@@ -154,7 +154,7 @@ class AdminApiClient {
       _post('/api/v1/admin/events/$id/toggle-publish', {});
 
   Future<Map<String, dynamic>> checkIn(int eventId, dynamic ticketId) =>
-      _post('/api/v1/admin/events/$eventId/attendees/$ticketId/checkin', {});
+      _post('/api/v1/admin/events/$eventId/checkin/$ticketId', {});
 
   Future<Map<String, dynamic>> undoCheckin(int eventId, dynamic ticketId) =>
       _post('/api/v1/admin/events/$eventId/attendees/$ticketId/undo-checkin', {});

@@ -264,7 +264,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with SingleTicker
     final isCancelled = e?['is_cancelled'] == true;
     final isSoldOut = e?['sold_out'] == true;
     final isPublished = e?['is_published'] != false;
-    final checkedIn = _attendees.where((a) => a['checked_in_at'] != null).length;
+    final checkedIn = _attendees.where((a) => a['checked_in'] == true || a['checked_in_at'] != null).length;
 
     return Scaffold(
       backgroundColor: kBackground,
@@ -484,10 +484,10 @@ class _AttendeesTab extends StatelessWidget {
           separatorBuilder: (_, __) => const Divider(height: 1, indent: 16),
           itemBuilder: (_, i) {
             final a = attendees[i];
-            final isCheckedIn = a['checked_in_at'] != null;
-            final name = a['buyer_name'] ?? 'Guest';
-            final email = a['buyer_email'] ?? '';
-            final tierName = a['tier_name'] ?? '';
+            final isCheckedIn = a['checked_in'] == true || a['checked_in_at'] != null;
+            final name = a['name'] ?? a['buyer_name'] ?? 'Guest';
+            final email = a['email'] ?? a['buyer_email'] ?? '';
+            final tierName = a['ticket_type_name'] ?? a['tier_name'] ?? '';
             final qty = a['quantity'] ?? 1;
             final checkedInAt = _parseDate(a['checked_in_at']);
 
