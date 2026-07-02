@@ -8,6 +8,7 @@ import 'screens/inbox/inbox_screen.dart';
 import 'screens/events/events_screen.dart';
 import 'screens/rentals/rentals_screen.dart';
 import 'screens/marketing/marketing_screen.dart';
+import 'screens/calendar/calendar_screen.dart';
 
 void main() {
   runApp(
@@ -63,6 +64,7 @@ class _AdminShellState extends State<_AdminShell> {
     InboxScreen(),
     EventsScreen(),
     RentalsScreen(),
+    CalendarScreen(),
     MarketingScreen(),
   ];
 
@@ -73,7 +75,7 @@ class _AdminShellState extends State<_AdminShell> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _index,
         onTap: (i) {
-          if (i == 5) {
+          if (i == 6) {
             context.read<AppProvider>().forceLogout();
             return;
           }
@@ -99,6 +101,11 @@ class _AdminShellState extends State<_AdminShell> {
             icon: Icon(Icons.home_work_outlined),
             activeIcon: Icon(Icons.home_work),
             label: 'Rentals',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_month_outlined),
+            activeIcon: Icon(Icons.calendar_month),
+            label: 'Calendar',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.campaign_outlined),

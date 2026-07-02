@@ -159,6 +159,23 @@ class AdminApiClient {
   Future<Map<String, dynamic>> undoCheckin(int eventId, dynamic ticketId) =>
       _post('/api/v1/admin/events/$eventId/attendees/$ticketId/undo-checkin', {});
 
+
+  // ── Rental detail ─────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getRentalDetail(dynamic id) =>
+      _get('/api/v1/admin/rentals/$id');
+
+  Future<Map<String, dynamic>> confirmRentalDetail(String id,
+      {double? deposit, double? total, String notes = ''}) =>
+      _post('/api/v1/admin/rentals/$id/confirm-detail', {
+        if (deposit != null) 'deposit_amount': deposit,
+        if (total != null) 'total_amount': total,
+        'admin_notes': notes,
+      });
+
+  Future<Map<String, dynamic>> addRentalNote(String id, String note) =>
+      _post('/api/v1/admin/rentals/$id/add-note', {'note': note});
+
   // ── HTTP plumbing ─────────────────────────────────────────────────────────
 
   Map<String, String> get _headers => {
