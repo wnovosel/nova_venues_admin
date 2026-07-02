@@ -97,8 +97,8 @@ class AdminApiClient {
   Future<Map<String, dynamic>> getRentals() =>
       _get('/api/v1/nova-admin/rentals');
 
-  Future<Map<String, dynamic>> confirmRental(String id, Map<String, dynamic> data) =>
-      _post('/api/v1/nova-admin/rentals/$id/confirm', {'status': 'confirmed'});
+  Future<Map<String, dynamic>> confirmRental(String id) =>
+      _post('/api/v1/nova-admin/rentals/$id/confirm', {});
 
   Future<Map<String, dynamic>> declineRental(String id) =>
       _post('/api/v1/nova-admin/rentals/$id/decline', {});
