@@ -83,15 +83,6 @@ class AdminApiClient {
   Future<Map<String, dynamic>> getEvents() =>
       _get('/api/v1/admin/events');
 
-  Future<Map<String, dynamic>> getEventAttendees(int id) =>
-      _get('/api/v1/admin/events/$id/attendees');
-
-  Future<Map<String, dynamic>> cancelEvent(String id) =>
-      _post('/api/v1/admin/events/$id/checkin/0', {});
-
-  Future<Map<String, dynamic>> toggleSoldOut(String id) =>
-      _post('/api/v1/admin/events/$id/checkin/0', {});
-
   // ── Rentals ───────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getRentals() =>
