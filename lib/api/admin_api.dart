@@ -115,16 +115,16 @@ class AdminApiClient {
   // ── Dashboard ────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getDashboard() =>
-      _get('/api/v1/admin/brief');
+      _get('/api/v1/admin/dashboard');
 
   Future<Map<String, dynamic>> markVoicemailHandled(dynamic id) =>
-      _post('/api/v1/admin/customers', {});
+      _post('/api/v1/admin/dashboard/voicemail/$id/handled', {});
 
   Future<Map<String, dynamic>> updateHireStatus(dynamic id, String status) =>
-      _post('/api/v1/admin/vendors/$id/status', {'status': status});
+      _post('/api/v1/admin/dashboard/hire/$id/status', {'status': status});
 
   Future<Map<String, dynamic>> updateVendorStatus(dynamic id, String status) =>
-      _post('/api/v1/admin/vendors/$id/status', {'status': status});
+      _post('/api/v1/admin/dashboard/vendor/$id/status', {'status': status});
 
   // ── Marketing snap ────────────────────────────────────────────────────────
 
