@@ -49,10 +49,7 @@ class AdminApiClient {
   Future<void> restoreSession() async {
     _token = await _storage.read(key: 'admin_token');
     _refreshToken = await _storage.read(key: 'admin_refresh');
-    // Try to refresh immediately on restore if we have a refresh token
-    if (_token != null && _refreshToken != null) {
-      await _refreshIfNeeded();
-    }
+    // Token is trusted on restore — refresh happens lazily on 401
   }
 
   Future<bool> _refreshIfNeeded() async {
@@ -247,9 +244,6 @@ class AdminApiClient {
 
   Map<String, dynamic> _handle(http.Response res) {
     if (res.statusCode == 401) {
-      // Clear token — _get/_post will catch the exception and caller can retry
-      _token = null;
-      _storage.delete(key: 'admin_token');
       throw const ApiException('Session expired. Please log in again.', statusCode: 401);
     }
     if (res.statusCode == 403) {

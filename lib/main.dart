@@ -82,13 +82,15 @@ class _AdminShellState extends State<_AdminShell> {
           child: Row(children: [
             Image.asset('assets/images/nova_venue_logo.png', height: 30, width: 30),
             const SizedBox(width: 10),
-            const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Nova Destinations', style: TextStyle(
-                color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
-              Text('Nova Venues Admin', style: TextStyle(
-                color: Color(0xFF9B1B2B), fontSize: 11, fontWeight: FontWeight.w500,
-                letterSpacing: 1)),
-            ]),
+            Consumer<AppProvider>(
+              builder: (_, provider, __) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(provider.tenantName, style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
+                const Text('Nova Venues Admin', style: TextStyle(
+                  color: Color(0xFF9B1B2B), fontSize: 11, fontWeight: FontWeight.w500,
+                  letterSpacing: 1)),
+              ]),
+            ),
           ]),
         ),
         Expanded(child: IndexedStack(index: _index, children: _screens)),

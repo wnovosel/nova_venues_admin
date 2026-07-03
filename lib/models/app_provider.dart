@@ -6,10 +6,12 @@ class AppProvider extends ChangeNotifier {
   bool _loading = true;
   bool _loggedIn = false;
   String? _error;
+  String _tenantName = 'Nova Venues';
 
-  bool get loading  => _loading;
-  bool get loggedIn => _loggedIn;
-  String? get error => _error;
+  bool get loading      => _loading;
+  bool get loggedIn     => _loggedIn;
+  String? get error     => _error;
+  String get tenantName => _tenantName;
 
   AppProvider() { _restore(); }
 
@@ -43,6 +45,7 @@ class AppProvider extends ChangeNotifier {
       final ok = await api.login(email, password);
       _loggedIn = ok;
       if (!ok) _error = 'Invalid email or password.';
+      if (ok) await _fetchTenantName();
       _loading = false;
       notifyListeners();
       return ok;
@@ -52,6 +55,14 @@ class AppProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  Future<void> _fetchTenantName() async {
+    try {
+      final res = await api.getMorningData();
+      final name = res['tenant_name'] as String?;
+      if (name != null && name.isNotEmpty) _tenantName = name;
+    } catch (_) {}
   }
 
   Future<void> logout() async {
