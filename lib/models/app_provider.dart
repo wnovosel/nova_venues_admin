@@ -30,11 +30,14 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  void forceLogout() {
-    api.logout();
+  Future<void> forceLogout() async {
     _loggedIn = false;
+    _tenantName = 'Nova Venues';
     _error = null;
     notifyListeners();
+    // Logout after notifying so UI can transition first
+    await Future.delayed(const Duration(milliseconds: 100));
+    await api.logout();
   }
 
   Future<bool> login(String email, String password) async {

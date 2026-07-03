@@ -97,9 +97,9 @@ class _AdminShellState extends State<_AdminShell> {
       ]),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _index,
-        onTap: (i) {
+        onTap: (i) async {
           if (i == 6) {
-            context.read<AppProvider>().forceLogout();
+            await context.read<AppProvider>().forceLogout();
             return;
           }
           setState(() => _index = i);
