@@ -363,22 +363,9 @@ class _RentalCard extends StatelessWidget {
           if (item['event_date'] != null)
             Text(_formatDate(item['event_date']), style: const TextStyle(fontSize: 11, color: kTextMuted)),
         ])),
-        _ActionButtons(
-          onApprove: () => _confirm(context),
-          onDecline: () => _decline(context),
-        ),
+        const Icon(Icons.chevron_right, color: kBorder, size: 18),
       ]),
     );
-  }
-
-  Future<void> _confirm(BuildContext context) async {
-    await context.read<AppProvider>().api.confirmRental(item['id']);
-    onRefresh();
-  }
-
-  Future<void> _decline(BuildContext context) async {
-    await context.read<AppProvider>().api.declineRental(item['id']);
-    onRefresh();
   }
 }
 
