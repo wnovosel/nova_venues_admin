@@ -85,11 +85,12 @@ class _MorningScreenState extends State<MorningScreen> {
 
                 // Action items — the meat of the dashboard
                 _ActionSection(
-                  title: 'New Hire Requests',
+                  title: 'New Hire Applications',
                   icon: Icons.person_add_outlined,
                   color: kSuccess,
                   items: (_dashboard['new_hires'] as List? ?? []).cast<Map<String,dynamic>>(),
-                  emptyText: 'No pending applications',
+                  counts: (_dashboard['hire_counts'] as Map?)?.cast<String,dynamic>(),
+                  emptyText: 'No new applications',
                   builder: (item) => _HireCard(item: item, onRefresh: _load),
                 ),
                 const SizedBox(height: 12),
@@ -99,7 +100,7 @@ class _MorningScreenState extends State<MorningScreen> {
                   icon: Icons.storefront_outlined,
                   color: kWarning,
                   items: (_dashboard['new_vendors'] as List? ?? []).cast<Map<String,dynamic>>(),
-                  emptyText: 'No pending vendor requests',
+                  emptyText: 'No new vendor requests',
                   builder: (item) => _VendorCard(item: item, onRefresh: _load),
                 ),
                 const SizedBox(height: 12),
@@ -119,7 +120,8 @@ class _MorningScreenState extends State<MorningScreen> {
                   icon: Icons.home_work_outlined,
                   color: Color(0xFF6B4FBB),
                   items: (_dashboard['new_rentals'] as List? ?? []).cast<Map<String,dynamic>>(),
-                  emptyText: 'No pending rental requests',
+                  counts: (_dashboard['rental_counts'] as Map?)?.cast<String,dynamic>(),
+                  emptyText: 'No new rental requests',
                   builder: (item) => _RentalCard(item: item, onRefresh: _load),
                 ),
                 const SizedBox(height: 12),
@@ -184,11 +186,13 @@ class _ActionSection extends StatelessWidget {
   final IconData icon;
   final Color color;
   final List<Map<String, dynamic>> items;
+  final Map<String, dynamic>? counts;
   final Widget Function(Map<String, dynamic>) builder;
 
   const _ActionSection({
     required this.title, required this.icon, required this.color,
     required this.items, required this.emptyText, required this.builder,
+    this.counts,
   });
 
   @override
@@ -197,7 +201,7 @@ class _ActionSection extends StatelessWidget {
       decoration: cardDecoration(),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
           child: Row(children: [
             Icon(icon, size: 16, color: color),
             const SizedBox(width: 8),
@@ -207,10 +211,25 @@ class _ActionSection extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
-                child: Text('${items.length}', style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w700)),
+                child: Text('${items.length} new', style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w700)),
               ),
           ]),
         ),
+        // Status count pills
+        if (counts != null && counts!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Wrap(spacing: 6, children: counts!.entries.map((e) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: kBackground,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: kBorder),
+              ),
+              child: Text('${e.key}: ${e.value}',
+                style: const TextStyle(fontSize: 11, color: kTextMuted, fontWeight: FontWeight.w500)),
+            )).toList()),
+          ),
         if (items.isEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
