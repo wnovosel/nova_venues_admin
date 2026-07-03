@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../../models/app_provider.dart';
 import '../../theme/app_theme.dart';
 
@@ -199,9 +201,28 @@ class _MarketingScreenState extends State<MarketingScreen> {
   }
 
   Future<List<int>?> _pickFromCamera(BuildContext context) async {
-    // In production: use image_picker. For now show placeholder.
-    _showError('Camera requires image_picker plugin — add to pubspec and rebuild via Xcode Cloud');
-    return null;
+    final picker = ImagePicker();
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: kSurface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        ListTile(
+          leading: const Icon(Icons.camera_alt, color: kPrimary),
+          title: const Text('Take Photo'),
+          onTap: () => Navigator.pop(context, ImageSource.camera),
+        ),
+        ListTile(
+          leading: const Icon(Icons.photo_library, color: kPrimary),
+          title: const Text('Choose from Library'),
+          onTap: () => Navigator.pop(context, ImageSource.gallery),
+        ),
+      ])),
+    );
+    if (source == null) return null;
+    final picked = await picker.pickImage(source: source, imageQuality: 85);
+    if (picked == null) return null;
+    return await File(picked.path).readAsBytes();
   }
 
   void _showSuccess(String msg) {
