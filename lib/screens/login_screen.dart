@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 import '../models/app_provider.dart';
 import '../theme/app_theme.dart';
@@ -9,9 +10,40 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _email = TextEditingController();
-  final _pass  = TextEditingController();
-  bool _obscure = true;
+  final _email   = TextEditingController();
+  final _pass    = TextEditingController();
+  final _auth    = LocalAuthentication();
+  bool _obscure  = true;
+  bool _canBiometric = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBiometrics();
+  }
+
+  Future<void> _checkBiometrics() async {
+    try {
+      final canAuth = await _auth.canCheckBiometrics;
+      final isSupported = await _auth.isDeviceSupported();
+      setState(() => _canBiometric = canAuth && isSupported);
+      if (_canBiometric) _tryBiometric();
+    } catch (_) {}
+  }
+
+  Future<void> _tryBiometric() async {
+    try {
+      final authenticated = await _auth.authenticate(
+        localizedReason: 'Sign in to Nova Venues Admin',
+        options: const AuthenticationOptions(biometricOnly: true, stickyAuth: true),
+      );
+      if (authenticated && mounted) {
+        final provider = context.read<AppProvider>();
+        // Restore existing session — biometric just unlocks it
+        await provider.restoreAndValidate();
+      }
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -114,7 +146,21 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: const TextStyle(color: Color(0xFF9B1B2B), fontSize: 13)),
               ],
 
-              const SizedBox(height: 28),
+              const SizedBox(height: 16),
+
+              // Face ID button
+              if (_canBiometric)
+                GestureDetector(
+                  onTap: _tryBiometric,
+                  child: Column(children: [
+                    Icon(Icons.face_unlock_outlined, color: const Color(0xFF9B1B2B), size: 36),
+                    const SizedBox(height: 4),
+                    const Text('Sign in with Face ID',
+                        style: TextStyle(color: Color(0xFF9B1B2B), fontSize: 13, fontWeight: FontWeight.w600)),
+                  ]),
+                ),
+
+              const SizedBox(height: 20),
 
               // Sign in button
               SizedBox(

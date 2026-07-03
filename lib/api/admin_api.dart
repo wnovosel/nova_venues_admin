@@ -49,6 +49,32 @@ class AdminApiClient {
   Future<void> restoreSession() async {
     _token = await _storage.read(key: 'admin_token');
     _refreshToken = await _storage.read(key: 'admin_refresh');
+    // Try to refresh immediately on restore if we have a refresh token
+    if (_token != null && _refreshToken != null) {
+      await _refreshIfNeeded();
+    }
+  }
+
+  Future<bool> _refreshIfNeeded() async {
+    if (_refreshToken == null) return false;
+    try {
+      const supabaseUrl = 'https://umgsxpdtwoehomqcagvd.supabase.co';
+      const supabaseKey = 'sb_publishable_icPM2xuhjXOhGluB514rpg_h63K3ofb';
+      final res = await http.post(
+        Uri.parse('$supabaseUrl/auth/v1/token?grant_type=refresh_token'),
+        headers: {'Content-Type': 'application/json', 'apikey': supabaseKey},
+        body: jsonEncode({'refresh_token': _refreshToken}),
+      ).timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        _token = body['access_token'];
+        _refreshToken = body['refresh_token'];
+        await _storage.write(key: 'admin_token', value: _token);
+        await _storage.write(key: 'admin_refresh', value: _refreshToken);
+        return true;
+      }
+    } catch (_) {}
+    return false;
   }
 
   Future<void> logout() async {
@@ -213,10 +239,16 @@ class AdminApiClient {
 
   Map<String, dynamic> _handle(http.Response res) {
     if (res.statusCode == 401) {
-      _token = null;
-      _refreshToken = null;
-      _storage.deleteAll();
-      throw const ApiException('Session expired. Please log in again.', statusCode: 401);
+      // Try to refresh token before giving up
+      final refreshed = await _refreshIfNeeded();
+      if (!refreshed) {
+        _token = null;
+        _refreshToken = null;
+        _storage.deleteAll();
+        throw const ApiException('Session expired. Please log in again.', statusCode: 401);
+      }
+      // Retry is handled by caller re-calling the method
+      throw const ApiException('Token refreshed — retry', statusCode: 401);
     }
     if (res.statusCode == 403) {
       throw const ApiException('Access denied.', statusCode: 403);

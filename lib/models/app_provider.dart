@@ -20,6 +20,14 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> restoreAndValidate() async {
+    await api.restoreSession();
+    if (api.isAuthenticated) {
+      _loggedIn = true;
+      notifyListeners();
+    }
+  }
+
   void forceLogout() {
     api.logout();
     _loggedIn = false;
