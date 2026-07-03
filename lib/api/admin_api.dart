@@ -197,6 +197,21 @@ class AdminApiClient {
   Future<Map<String, dynamic>> addRentalNote(String id, String note) =>
       _post('/api/v1/admin/rentals/$id/add-note', {'note': note});
 
+
+  // ── Inbox IMAP actions ───────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> archiveEmail(int id) =>
+      _post('/api/v1/admin-inbox/email/$id/archive', {});
+
+  Future<Map<String, dynamic>> trashEmail(int id) =>
+      _post('/api/v1/admin-inbox/email/$id/trash', {});
+
+  Future<Map<String, dynamic>> markEmailUnread(int id) =>
+      _post('/api/v1/admin-inbox/email/$id/unread', {});
+
+  Future<Map<String, dynamic>> markEmailSpam(int id) =>
+      _post('/api/v1/admin-inbox/email/$id/spam', {});
+
   // ── HTTP plumbing ─────────────────────────────────────────────────────────
 
   Map<String, String> get _headers => {

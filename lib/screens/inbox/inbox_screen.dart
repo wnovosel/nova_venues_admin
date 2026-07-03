@@ -7,7 +7,7 @@ import '../../theme/app_theme.dart';
 
 // ── Swipe action config ───────────────────────────────────────────────────────
 
-enum SwipeAction { archive, delete, markRead, markUnread, none }
+enum SwipeAction { archive, delete, markRead, markUnread, spam, none }
 
 class InboxSettings {
   final SwipeAction swipeLeft;
@@ -76,22 +76,39 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
 
   void _handleSwipeAction(SwipeAction action, Map<String, dynamic> email) {
     final id = email['id'] as int;
-    setState(() {
-      switch (action) {
-        case SwipeAction.archive:
-          _archivedIds.add(id);
-          _showUndoSnackbar('Archived', () => setState(() => _archivedIds.remove(id)));
-        case SwipeAction.delete:
-          _deletedIds.add(id);
-          _showUndoSnackbar('Deleted', () => setState(() => _deletedIds.remove(id)));
-        case SwipeAction.markRead:
-          _readOverride[id] = true;
-        case SwipeAction.markUnread:
-          _readOverride[id] = false;
-        case SwipeAction.none:
-          break;
-      }
-    });
+    final api = context.read<AppProvider>().api;
+
+    switch (action) {
+      case SwipeAction.archive:
+        setState(() => _archivedIds.add(id));
+        api.archiveEmail(id).catchError((_) {
+          setState(() => _archivedIds.remove(id));
+          _showUndoSnackbar('Archive failed', () {});
+        });
+        _showUndoSnackbar('Archived', () {
+          setState(() => _archivedIds.remove(id));
+        });
+      case SwipeAction.delete:
+        setState(() => _deletedIds.add(id));
+        api.trashEmail(id).catchError((_) {
+          setState(() => _deletedIds.remove(id));
+          _showUndoSnackbar('Delete failed', () {});
+        });
+        _showUndoSnackbar('Deleted', () {
+          setState(() => _deletedIds.remove(id));
+        });
+      case SwipeAction.markRead:
+        setState(() => _readOverride[id] = true);
+      case SwipeAction.markUnread:
+        setState(() => _readOverride[id] = false);
+        api.markEmailUnread(id);
+      case SwipeAction.spam:
+        setState(() => _deletedIds.add(id));
+        api.markEmailSpam(id);
+        _showUndoSnackbar('Marked as spam', () => setState(() => _deletedIds.remove(id)));
+      case SwipeAction.none:
+        break;
+    }
   }
 
   void _showUndoSnackbar(String label, VoidCallback undo) {
@@ -246,6 +263,7 @@ class _SwipeSelector extends StatelessWidget {
     SwipeAction.delete,
     SwipeAction.markRead,
     SwipeAction.markUnread,
+    SwipeAction.spam,
     SwipeAction.none,
   ];
 
@@ -254,6 +272,7 @@ class _SwipeSelector extends StatelessWidget {
     SwipeAction.delete:     'Delete',
     SwipeAction.markRead:   'Mark Read',
     SwipeAction.markUnread: 'Mark Unread',
+    SwipeAction.spam:       'Spam',
     SwipeAction.none:       'None',
   };
 
@@ -302,6 +321,7 @@ class _EmailList extends StatelessWidget {
     SwipeAction.delete:     kError,
     SwipeAction.markRead:   kSuccess,
     SwipeAction.markUnread: kPrimary,
+    SwipeAction.spam:       kWarning,
     SwipeAction.none:       kBorder,
   };
 
@@ -310,6 +330,7 @@ class _EmailList extends StatelessWidget {
     SwipeAction.delete:     Icons.delete_outlined,
     SwipeAction.markRead:   Icons.mark_email_read_outlined,
     SwipeAction.markUnread: Icons.mark_email_unread_outlined,
+    SwipeAction.spam:       Icons.report_outlined,
     SwipeAction.none:       Icons.block,
   };
 
@@ -318,6 +339,7 @@ class _EmailList extends StatelessWidget {
     SwipeAction.delete:     'Delete',
     SwipeAction.markRead:   'Read',
     SwipeAction.markUnread: 'Unread',
+    SwipeAction.spam:       'Spam',
     SwipeAction.none:       '',
   };
 
