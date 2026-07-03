@@ -71,7 +71,28 @@ class _AdminShellState extends State<_AdminShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _index, children: _screens),
+      body: Column(children: [
+        // Persistent top bar with logo + tenant name
+        Container(
+          color: const Color(0xFF0A0A0A),
+          padding: EdgeInsets.only(
+            top: MediaQuery.of(context).padding.top,
+            left: 16, right: 16, bottom: 10,
+          ),
+          child: Row(children: [
+            Image.asset('assets/images/nova_venue_logo.png', height: 30, width: 30),
+            const SizedBox(width: 10),
+            const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Nova Destinations', style: TextStyle(
+                color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
+              Text('Nova Venues Admin', style: TextStyle(
+                color: Color(0xFF9B1B2B), fontSize: 11, fontWeight: FontWeight.w500,
+                letterSpacing: 1)),
+            ]),
+          ]),
+        ),
+        Expanded(child: IndexedStack(index: _index, children: _screens)),
+      ]),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _index,
         onTap: (i) {

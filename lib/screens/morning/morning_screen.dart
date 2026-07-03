@@ -100,6 +100,7 @@ class _MorningScreenState extends State<MorningScreen> {
                   icon: Icons.storefront_outlined,
                   color: kWarning,
                   items: (_dashboard['new_vendors'] as List? ?? []).cast<Map<String,dynamic>>(),
+                  counts: (_dashboard['vendor_counts'] as Map?)?.cast<String,dynamic>(),
                   emptyText: 'No new vendor requests',
                   builder: (item) => _VendorCard(item: item, onRefresh: _load),
                 ),
