@@ -94,8 +94,6 @@ class AdminApiClient {
   Future<Map<String, dynamic>> declineRental(String id) =>
       _post('/api/v1/admin/rentals/$id/status', {});
 
-  Future<Map<String, dynamic>> addRentalNote(String id, String note) =>
-      _post('/api/v1/admin/rentals/$id/status', {'note': note});
 
   // ── Marketing ─────────────────────────────────────────────────────────────
 
