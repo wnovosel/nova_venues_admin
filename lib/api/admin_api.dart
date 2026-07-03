@@ -118,14 +118,14 @@ class AdminApiClient {
   // ── Marketing snap ────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getR2UploadUrl() =>
-      _get('/api/v1/admin/brief');
+      _get('/api/v1/admin/marketing/r2-upload-url');
 
   Future<Map<String, dynamic>> snapPost(String imageUrl, String platform, String action) =>
-      _post('/api/v1/admin/brief',
+      _post('/api/v1/admin/marketing/snap-post',
           {'image_url': imageUrl, 'platform': platform, 'action': action});
 
   Future<Map<String, dynamic>> snapArchive(String imageUrl) =>
-      _post('/api/v1/admin/brief', {'image_url': imageUrl});
+      _post('/api/v1/admin/marketing/snap-archive', {'image_url': imageUrl});
 
   Future<void> uploadToR2(String uploadUrl, List<int> bytes) async {
     await http.put(Uri.parse(uploadUrl), body: bytes,
@@ -133,7 +133,7 @@ class AdminApiClient {
   }
 
   Future<Map<String, dynamic>> approvePost(dynamic id) =>
-      _post('/api/v1/admin/vendors/$id/status', {});
+      _post('/api/v1/admin/marketing/$id/approve', {});
 
 
   Future<Map<String, dynamic>> getEventAttendees(int id) =>
