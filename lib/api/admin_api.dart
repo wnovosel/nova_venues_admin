@@ -210,10 +210,18 @@ class AdminApiClient {
 
   Future<Map<String, dynamic>> _get(String path) async {
     try {
-      final res = await http.get(
+      var res = await http.get(
         Uri.parse('$kApiBase$path'),
         headers: _headers,
       ).timeout(const Duration(seconds: 15));
+      // Auto-refresh on 401 and retry once
+      if (res.statusCode == 401 && _refreshToken != null) {
+        final refreshed = await _refreshIfNeeded();
+        if (refreshed) {
+          res = await http.get(Uri.parse('$kApiBase$path'), headers: _headers)
+              .timeout(const Duration(seconds: 15));
+        }
+      }
       return _handle(res);
     } on SocketException {
       throw const ApiException('No internet connection.');
@@ -239,16 +247,10 @@ class AdminApiClient {
 
   Map<String, dynamic> _handle(http.Response res) {
     if (res.statusCode == 401) {
-      // Try to refresh token before giving up
-      final refreshed = await _refreshIfNeeded();
-      if (!refreshed) {
-        _token = null;
-        _refreshToken = null;
-        _storage.deleteAll();
-        throw const ApiException('Session expired. Please log in again.', statusCode: 401);
-      }
-      // Retry is handled by caller re-calling the method
-      throw const ApiException('Token refreshed — retry', statusCode: 401);
+      // Clear token — _get/_post will catch the exception and caller can retry
+      _token = null;
+      _storage.delete(key: 'admin_token');
+      throw const ApiException('Session expired. Please log in again.', statusCode: 401);
     }
     if (res.statusCode == 403) {
       throw const ApiException('Access denied.', statusCode: 403);
