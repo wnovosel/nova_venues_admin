@@ -278,8 +278,20 @@ class _HireCard extends StatelessWidget {
   }
 
   Future<void> _updateStatus(BuildContext context, String status) async {
-    await context.read<AppProvider>().api.updateHireStatus(item['id'], status);
-    onRefresh();
+    try {
+      await context.read<AppProvider>().api.updateHireStatus(item['id'], status);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('${item['name']} moved to ${status} ✓'),
+          backgroundColor: status == 'interviewing' ? kSuccess : kError,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+      onRefresh();
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: kError));
+    }
   }
 }
 
@@ -294,27 +306,65 @@ class _VendorCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(children: [
-        Container(width: 36, height: 36,
-          decoration: BoxDecoration(color: kWarning.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-          child: const Icon(Icons.storefront, color: kWarning, size: 18)),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(item['business_name'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-          if (item['contact_name'] != null)
-            Text(item['contact_name'], style: const TextStyle(fontSize: 12, color: kTextMuted)),
-        ])),
-        _ActionButtons(
-          onApprove: () => _updateStatus(context, 'approved'),
-          onDecline: () => _updateStatus(context, 'rejected'),
-        ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(width: 36, height: 36,
+            decoration: BoxDecoration(color: kWarning.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            child: const Icon(Icons.storefront, color: kWarning, size: 18)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(item['business_name'] ?? 'Unknown',
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            if (item['event_name'] != null)
+              Text('For: ${item['event_name']}',
+                style: const TextStyle(fontSize: 12, color: kPrimary, fontWeight: FontWeight.w500)),
+            if (item['contact_name'] != null)
+              Text(item['contact_name'],
+                style: const TextStyle(fontSize: 12, color: kTextMuted)),
+          ])),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          const SizedBox(width: 48),
+          Expanded(child: OutlinedButton(
+            onPressed: () => _updateStatus(context, 'rejected'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: kError, side: const BorderSide(color: kError),
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              minimumSize: Size.zero,
+            ),
+            child: const Text('Decline', style: TextStyle(fontSize: 12)),
+          )),
+          const SizedBox(width: 8),
+          Expanded(child: ElevatedButton(
+            onPressed: () => _updateStatus(context, 'approved'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              minimumSize: Size.zero,
+              textStyle: const TextStyle(fontSize: 12),
+            ),
+            child: const Text('Approve'),
+          )),
+        ]),
       ]),
     );
   }
 
   Future<void> _updateStatus(BuildContext context, String status) async {
-    await context.read<AppProvider>().api.updateVendorStatus(item['id'], status);
-    onRefresh();
+    try {
+      await context.read<AppProvider>().api.updateVendorStatus(item['id'], status);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('${item['business_name']} ${status == 'approved' ? 'approved ✓' : 'declined'}'),
+          backgroundColor: status == 'approved' ? kSuccess : kError,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+      onRefresh();
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: kError));
+    }
   }
 }
 
