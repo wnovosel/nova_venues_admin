@@ -18,53 +18,91 @@ class _LoginScreenState extends State<LoginScreen> {
     final provider = context.watch<AppProvider>();
 
     return Scaffold(
-      backgroundColor: kBackground,
+      backgroundColor: const Color(0xFF0A0A0A), // near-black like logo
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(28),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 52),
+              const SizedBox(height: 40),
 
-              // Logo area
-              Container(
-                width: 56, height: 56,
-                decoration: BoxDecoration(
-                  color: kPrimary,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.wine_bar, color: Colors.white, size: 28),
+              // Logo
+              Image.asset(
+                'assets/images/nova_venue_logo.png',
+                width: 220,
+                height: 220,
               ),
-              const SizedBox(height: 24),
 
-              const Text('Nova Venues', style: TextStyle(
-                fontSize: 28, fontWeight: FontWeight.w700,
-                color: kTextDark, fontFamily: 'Georgia',
-              )),
-              const SizedBox(height: 4),
-              const Text('Admin Portal', style: TextStyle(
-                fontSize: 15, color: kTextMuted,
-              )),
+              const SizedBox(height: 8),
+
+              // Tagline
+              const Text(
+                'Admin Portal',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF9B1B2B),
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 3,
+                ),
+              ),
 
               const SizedBox(height: 48),
 
+              // Email field
               TextField(
                 controller: _email,
                 keyboardType: TextInputType.emailAddress,
                 autocorrect: false,
-                decoration: const InputDecoration(labelText: 'Email'),
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  labelStyle: const TextStyle(color: Color(0xFF888888)),
+                  filled: true,
+                  fillColor: const Color(0xFF1A1A1A),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF333333)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF333333)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF9B1B2B), width: 1.5),
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
 
+              // Password field
               TextField(
                 controller: _pass,
                 obscureText: _obscure,
+                style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'Password',
+                  labelStyle: const TextStyle(color: Color(0xFF888888)),
+                  filled: true,
+                  fillColor: const Color(0xFF1A1A1A),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF333333)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF333333)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF9B1B2B), width: 1.5),
+                  ),
                   suffixIcon: IconButton(
-                    icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                    color: kTextMuted,
+                    icon: Icon(
+                      _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                      color: const Color(0xFF888888),
+                    ),
                     onPressed: () => setState(() => _obscure = !_obscure),
                   ),
                 ),
@@ -72,21 +110,30 @@ class _LoginScreenState extends State<LoginScreen> {
 
               if (provider.error != null) ...[
                 const SizedBox(height: 12),
-                Text(provider.error!, style: const TextStyle(color: kError, fontSize: 13)),
+                Text(provider.error!,
+                    style: const TextStyle(color: Color(0xFF9B1B2B), fontSize: 13)),
               ],
 
               const SizedBox(height: 28),
 
+              // Sign in button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: provider.loading ? null : () async {
                     await provider.login(_email.text.trim(), _pass.text);
                   },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF9B1B2B),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
                   child: provider.loading
                       ? const SizedBox(height: 18, width: 18,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('Sign In'),
+                      : const Text('Sign In',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
                 ),
               ),
             ],

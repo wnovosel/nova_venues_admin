@@ -25,7 +25,7 @@ class NovaAdminApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Nova Venues Admin',
+      title: 'Nova Venues',
       debugShowCheckedModeBanner: false,
       theme: buildAdminTheme(),
       home: const _AppRoot(),
