@@ -93,13 +93,13 @@ class AdminApiClient {
       _get('/api/v1/admin-inbox');
 
   Future<Map<String, dynamic>> getEmailDetail(int id) =>
-      _get('/api/v1/admin-inbox');
+      _get('/api/v1/admin-inbox/email/$id');
 
   Future<Map<String, dynamic>> replyEmail(int id, String body) =>
-      _post('/api/v1/admin/customers', {'body': body});
+      _post('/api/v1/admin-inbox/email/$id/reply', {'body': body});
 
   Future<Map<String, dynamic>> composeEmail(String to, String subject, String body) =>
-      _post('/api/v1/admin/customers', {'to': to, 'subject': subject, 'body': body});
+      _post('/api/v1/admin-inbox/compose', {'to': to, 'subject': subject, 'body': body});
 
   // ── Events ────────────────────────────────────────────────────────────────
 
