@@ -98,6 +98,15 @@ class AdminApiClient {
   Future<Map<String, dynamic>> replyEmail(int id, String body) =>
       _post('/api/v1/admin-inbox/email/$id/reply', {'body': body});
 
+  Future<Map<String, dynamic>> replyToMessage(int id, String body) =>
+      _post('/api/v1/admin-inbox/message/$id/reply', {'body': body});
+
+  Future<Map<String, dynamic>> markMessageHandled(int id, bool handled) =>
+      _post('/api/v1/admin-inbox/message/$id/handled', {'handled': handled});
+
+  Future<Map<String, dynamic>> markVoicemailHeard(String callSid) =>
+      _post('/api/v1/admin-inbox/voicemail/$callSid/heard', {});
+
   Future<Map<String, dynamic>> composeEmail(String to, String subject, String body) =>
       _post('/api/v1/admin-inbox/compose', {'to': to, 'subject': subject, 'body': body});
 

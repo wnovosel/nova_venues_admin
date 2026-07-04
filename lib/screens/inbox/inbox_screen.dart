@@ -124,7 +124,10 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     final calls = (_data['calls']  as List? ?? []).cast<Map<String, dynamic>>();
-    final chats = (_data['chats']  as List? ?? []).cast<Map<String, dynamic>>();
+    // "Messages" = left messages / leads awaiting a human (contact_submissions).
+    // Bot chat transcripts live in the web chat hub, not the inbox.
+    final messages = (_data['messages'] as List? ?? []).cast<Map<String, dynamic>>();
+    final unhandled = messages.where((m) => m['handled_at'] == null).length;
 
     return Scaffold(
       backgroundColor: kBackground,
@@ -149,7 +152,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
           tabs: [
             Tab(text: 'Email${_emails.isEmpty ? '' : ' (${_emails.length})'}'),
             Tab(text: 'Calls${calls.isEmpty ? '' : ' (${calls.length})'}'),
-            Tab(text: 'Chat${chats.isEmpty ? '' : ' (${chats.length})'}'),
+            Tab(text: 'Messages${unhandled == 0 ? '' : ' ($unhandled)'}'),
           ],
         ),
       ),
@@ -167,8 +170,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                       onSwipe: _handleSwipeAction,
                       onRefresh: _load,
                     ),
-                    _CallList(calls: calls),
-                    _ChatList(chats: chats),
+                    _CallList(calls: calls, onChanged: _load),
+                    _MessageList(messages: messages, onChanged: _load),
                   ],
                 ),
     );
@@ -812,7 +815,8 @@ class _ComposeField extends StatelessWidget {
 
 class _CallList extends StatelessWidget {
   final List<Map<String, dynamic>> calls;
-  const _CallList({required this.calls});
+  final VoidCallback onChanged;
+  const _CallList({required this.calls, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -826,7 +830,9 @@ class _CallList extends StatelessWidget {
         final summary  = (c['summary'] ?? '') as String;
         final intent   = (c['intent']  ?? '') as String;
         final when     = _formatDate(c['started_at'] ?? c['ended_at']);
-        final durSecs  = c['duration_seconds'] as int?;
+        final durSecs  = (c['duration_sec'] ?? c['duration_seconds']) as int?;
+        final isVm     = (c['voicemail_url'] ?? '').toString().isNotEmpty;
+        final vmNew    = isVm && c['voicemail_heard'] != true;
         final duration = durSecs != null
             ? '${durSecs ~/ 60}m ${durSecs % 60}s'
             : '';
@@ -841,15 +847,27 @@ class _CallList extends StatelessWidget {
               Container(
                 width: 40, height: 40,
                 decoration: BoxDecoration(
-                    color: kSuccess.withOpacity(0.1), shape: BoxShape.circle),
-                child: const Icon(Icons.phone, color: kSuccess, size: 20),
+                    color: (isVm ? kError : kSuccess).withOpacity(0.1),
+                    shape: BoxShape.circle),
+                child: Icon(isVm ? Icons.voicemail : Icons.phone,
+                    color: isVm ? kError : kSuccess, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
-                  Expanded(child: Text(caller, style: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 15, color: kTextDark))),
-                  Text(when, style: const TextStyle(fontSize: 12, color: kTextMuted)),
+                  Expanded(child: Text(caller, style: TextStyle(
+                      fontWeight: vmNew ? FontWeight.w800 : FontWeight.w600,
+                      fontSize: 15, color: kTextDark))),
+                  if (vmNew)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(color: kError,
+                          borderRadius: BorderRadius.circular(100)),
+                      child: const Text('VM', style: TextStyle(fontSize: 10,
+                          fontWeight: FontWeight.w800, color: Colors.white)),
+                    )
+                  else
+                    Text(when, style: const TextStyle(fontSize: 12, color: kTextMuted)),
                 ]),
                 if (intent.isNotEmpty)
                   Padding(
@@ -877,9 +895,9 @@ class _CallList extends StatelessWidget {
     );
   }
 
-  void _showCallDetail(BuildContext context, Map<String, dynamic> call) {
+  void _showCallDetail(BuildContext ctx0, Map<String, dynamic> call) {
     showModalBottomSheet(
-      context: context,
+      context: ctx0,
       isScrollControlled: true,
       backgroundColor: kSurface,
       shape: const RoundedRectangleBorder(
@@ -919,9 +937,29 @@ class _CallList extends StatelessWidget {
               _DetailSection(title: 'Summary', content: call['summary']),
               const SizedBox(height: 16),
             ],
-            if (call['duration_seconds'] != null) ...[
+            if ((call['voicemail_transcript'] ?? '').toString().isNotEmpty) ...[
+              _DetailSection(title: '🎙 Voicemail',
+                  content: call['voicemail_transcript']),
+              const SizedBox(height: 12),
+            ],
+            if ((call['voicemail_url'] ?? '').toString().isNotEmpty &&
+                call['voicemail_heard'] != true)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: FilledButton.icon(
+                  icon: const Icon(Icons.check),
+                  label: const Text('Mark voicemail heard'),
+                  onPressed: () async {
+                    final api = ctx0.read<AppProvider>().api;
+                    await api.markVoicemailHeard(call['call_sid'] as String);
+                    onChanged();
+                    if (ctx0.mounted) Navigator.pop(ctx0);
+                  },
+                ),
+              ),
+            if ((call['duration_sec'] ?? call['duration_seconds']) != null) ...[
               _DetailSection(title: 'Duration',
-                content: '${(call['duration_seconds'] as int) ~/ 60}m ${(call['duration_seconds'] as int) % 60}s'),
+                content: '${((call['duration_sec'] ?? call['duration_seconds']) as int) ~/ 60}m ${((call['duration_sec'] ?? call['duration_seconds']) as int) % 60}s'),
             ],
           ],
         ),
@@ -946,51 +984,174 @@ class _DetailSection extends StatelessWidget {
 
 // ── Chat List ─────────────────────────────────────────────────────────────────
 
-class _ChatList extends StatelessWidget {
-  final List<Map<String, dynamic>> chats;
-  const _ChatList({required this.chats});
+class _MessageList extends StatelessWidget {
+  final List<Map<String, dynamic>> messages;
+  final VoidCallback onChanged;
+  const _MessageList({required this.messages, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
-    if (chats.isEmpty) {
-      return const _EmptyState(icon: Icons.chat_bubble_outline, message: 'No chats yet');
+    if (messages.isEmpty) {
+      return const _EmptyState(icon: Icons.chat_bubble_outline,
+          message: 'No messages — when someone leaves a message\nfor the team, it lands here');
     }
-
     return ListView.builder(
-      itemCount: chats.length,
+      itemCount: messages.length,
       itemBuilder: (_, i) {
-        final c       = chats[i];
-        final name    = (c['visitor_name'] ?? c['visitor_email'] ?? 'Visitor') as String;
-        final lastMsg = (c['last_message'] ?? '') as String;
-        final when    = _formatDate(c['last_message_at']);
-        final count   = c['message_count'] ?? 0;
+        final m = messages[i];
+        final name    = (m['name'] ?? m['email'] ?? 'Someone') as String;
+        final msg     = (m['message'] ?? '') as String;
+        final when    = _formatDate(m['created_at']);
+        final source  = (m['source'] ?? '') as String;
+        final handled = m['handled_at'] != null;
 
-        return Container(
-          decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: kBorder))),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                  color: kWarning.withOpacity(0.1), shape: BoxShape.circle),
-              child: const Icon(Icons.chat_bubble, color: kWarning, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Expanded(child: Text(name, style: const TextStyle(
-                    fontWeight: FontWeight.w600, fontSize: 15, color: kTextDark))),
-                Text(when, style: const TextStyle(fontSize: 12, color: kTextMuted)),
-              ]),
-              Text('$count messages', style: const TextStyle(fontSize: 12, color: kTextMuted)),
-              if (lastMsg.isNotEmpty)
-                Text(lastMsg, style: const TextStyle(fontSize: 13, color: kTextMuted),
+        return InkWell(
+          onTap: () => _showDetail(context, m),
+          child: Container(
+            decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: kBorder))),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                    color: (handled ? kTextMuted : kWarning).withOpacity(0.12),
+                    shape: BoxShape.circle),
+                child: Icon(Icons.mark_chat_unread_outlined,
+                    color: handled ? kTextMuted : kWarning, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Expanded(child: Text(name, style: TextStyle(
+                      fontWeight: handled ? FontWeight.w500 : FontWeight.w800,
+                      fontSize: 15, color: kTextDark))),
+                  if (!handled)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(color: kPrimary,
+                          borderRadius: BorderRadius.circular(100)),
+                      child: const Text('NEW', style: TextStyle(fontSize: 10,
+                          fontWeight: FontWeight.w800, color: Colors.white)),
+                    )
+                  else
+                    Text(when, style: const TextStyle(fontSize: 12, color: kTextMuted)),
+                ]),
+                const SizedBox(height: 2),
+                Text(msg, style: const TextStyle(fontSize: 13, color: kTextMuted),
                     maxLines: 2, overflow: TextOverflow.ellipsis),
-            ])),
-          ]),
+                const SizedBox(height: 2),
+                Text('$source · $when',
+                    style: const TextStyle(fontSize: 11, color: kTextMuted)),
+              ])),
+            ]),
+          ),
         );
       },
+    );
+  }
+
+  void _showDetail(BuildContext context, Map<String, dynamic> m) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: kSurface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => _MessageDetailSheet(message: m, onChanged: onChanged),
+    );
+  }
+}
+
+class _MessageDetailSheet extends StatefulWidget {
+  final Map<String, dynamic> message;
+  final VoidCallback onChanged;
+  const _MessageDetailSheet({required this.message, required this.onChanged});
+  @override State<_MessageDetailSheet> createState() => _MessageDetailSheetState();
+}
+
+class _MessageDetailSheetState extends State<_MessageDetailSheet> {
+  final _reply = TextEditingController();
+  bool _sending = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final m = widget.message;
+    final email = (m['email'] ?? '') as String;
+    final handled = m['handled_at'] != null;
+    return Padding(
+      padding: EdgeInsets.only(
+          left: 20, right: 20, top: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20),
+      child: Column(mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text(m['name'] ?? email,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800,
+                  color: kTextDark))),
+          TextButton(
+            onPressed: () async {
+              final api = context.read<AppProvider>().api;
+              await api.markMessageHandled(m['id'] as int, !handled);
+              widget.onChanged();
+              if (mounted) Navigator.pop(context);
+            },
+            child: Text(handled ? 'Reopen' : 'Mark handled',
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ]),
+        if (email.isNotEmpty)
+          Text(email, style: const TextStyle(fontSize: 13, color: kTextMuted)),
+        if ((m['phone'] ?? '').toString().isNotEmpty)
+          Text(m['phone'], style: const TextStyle(fontSize: 13, color: kTextMuted)),
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(color: kBg,
+              borderRadius: BorderRadius.circular(12)),
+          child: Text(m['message'] ?? '',
+              style: const TextStyle(fontSize: 14, height: 1.5, color: kTextDark)),
+        ),
+        if (m['replied_at'] != null)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text('✓ Replied', style: TextStyle(fontSize: 12,
+                color: kSuccess, fontWeight: FontWeight.w700)),
+          ),
+        if (email.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          TextField(
+            controller: _reply, maxLines: 4, minLines: 2,
+            decoration: InputDecoration(
+              hintText: 'Reply to $email — sends from your mailbox…',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(width: double.infinity, child: FilledButton(
+            onPressed: _sending ? null : () async {
+              final body = _reply.text.trim();
+              if (body.isEmpty) return;
+              setState(() => _sending = true);
+              final api = context.read<AppProvider>().api;
+              final res = await api.replyToMessage(m['id'] as int, body);
+              if (!mounted) return;
+              if (res['sent'] == true) {
+                widget.onChanged();
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Reply sent ✓')));
+              } else {
+                setState(() => _sending = false);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('Failed: ${res['error'] ?? 'unknown'}')));
+              }
+            },
+            child: Text(_sending ? 'Sending…' : 'Send Reply'),
+          )),
+        ],
+      ]),
     );
   }
 }
