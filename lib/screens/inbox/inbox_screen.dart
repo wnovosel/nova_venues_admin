@@ -1108,7 +1108,7 @@ class _MessageDetailSheetState extends State<_MessageDetailSheet> {
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: kBg,
+          decoration: BoxDecoration(color: kBackground,
               borderRadius: BorderRadius.circular(12)),
           child: Text(m['message'] ?? '',
               style: const TextStyle(fontSize: 14, height: 1.5, color: kTextDark)),
