@@ -49,10 +49,55 @@ class AdminApiClient {
   Future<void> restoreSession() async {
     _token = await _storage.read(key: 'admin_token');
     _refreshToken = await _storage.read(key: 'admin_refresh');
-    // Token is trusted on restore — refresh happens lazily on 401
+    // Proactive: access tokens live 60 min. If this one is expired or about to
+    // expire, refresh NOW — before the home screen fires parallel requests.
+    // (Lazy refresh-on-401 under parallel load caused a refresh stampede: many
+    // requests reused the same rotating refresh token, Supabase reuse-detection
+    // revoked the whole token family, and the "session" died within the hour.)
+    if (_token != null && _tokenExpiresWithin(const Duration(minutes: 5))) {
+      final ok = await _refreshIfNeeded();
+      if (!ok && _tokenExpiresWithin(Duration.zero)) {
+        // Token is genuinely expired and refresh failed — don't fake-enter the
+        // app with a dead token (that's the "Face ID works then bounces" bug).
+        // Keep storage intact: a network blip shouldn't wipe credentials;
+        // the next launch retries the refresh.
+        _token = null;
+      }
+    }
   }
 
-  Future<bool> _refreshIfNeeded() async {
+  /// Decode the JWT exp claim locally — no network, no verification needed
+  /// (the server verifies; we only need the timestamp for scheduling).
+  bool _tokenExpiresWithin(Duration window) {
+    try {
+      final parts = _token!.split('.');
+      if (parts.length != 3) return true;
+      var payload = parts[1].replaceAll('-', '+').replaceAll('_', '/');
+      while (payload.length % 4 != 0) { payload += '='; }
+      final map = jsonDecode(utf8.decode(base64.decode(payload)));
+      final exp = (map['exp'] as num?)?.toInt();
+      if (exp == null) return true;
+      final expiry = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+      return DateTime.now().isAfter(expiry.subtract(window));
+    } catch (_) {
+      return true; // unreadable token → treat as expiring, refresh
+    }
+  }
+
+  // Single-flight: concurrent callers share ONE refresh. Firing multiple
+  // refreshes with the same rotating token trips Supabase reuse-detection
+  // and revokes the token family — the root cause of early "session expired".
+  Future<bool>? _refreshInFlight;
+
+  Future<bool> _refreshIfNeeded() {
+    final existing = _refreshInFlight;
+    if (existing != null) return existing;
+    final fut = _doRefresh().whenComplete(() => _refreshInFlight = null);
+    _refreshInFlight = fut;
+    return fut;
+  }
+
+  Future<bool> _doRefresh() async {
     if (_refreshToken == null) return false;
     try {
       const supabaseUrl = 'https://umgsxpdtwoehomqcagvd.supabase.co';
@@ -70,7 +115,14 @@ class AdminApiClient {
         await _storage.write(key: 'admin_refresh', value: _refreshToken);
         return true;
       }
-    } catch (_) {}
+      // 400/401 from the token endpoint = refresh token truly dead.
+      // Anything else (5xx, weird) — keep tokens, let the user retry later.
+      if (res.statusCode == 400 || res.statusCode == 401) {
+        return false;
+      }
+    } catch (_) {
+      // Network blip — do NOT kill the session over it.
+    }
     return false;
   }
 
@@ -231,6 +283,12 @@ class AdminApiClient {
 
   Future<Map<String, dynamic>> _get(String path) async {
     try {
+      // Proactive: refresh BEFORE the request if the token is stale — cheaper
+      // and safer than the 401 round-trip, and it single-flights under load.
+      if (_token != null && _refreshToken != null &&
+          _tokenExpiresWithin(const Duration(minutes: 2))) {
+        await _refreshIfNeeded();
+      }
       var res = await http.get(
         Uri.parse('$kApiBase$path'),
         headers: _headers,
@@ -253,11 +311,25 @@ class AdminApiClient {
 
   Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body) async {
     try {
-      final res = await http.post(
+      if (_token != null && _refreshToken != null &&
+          _tokenExpiresWithin(const Duration(minutes: 2))) {
+        await _refreshIfNeeded();
+      }
+      var res = await http.post(
         Uri.parse('$kApiBase$path'),
         headers: _headers,
         body: jsonEncode(body),
       ).timeout(const Duration(seconds: 15));
+      // _post previously had NO refresh-retry — any action after ~1h idle
+      // threw "Session expired" even though a refresh would have fixed it.
+      if (res.statusCode == 401 && _refreshToken != null) {
+        final refreshed = await _refreshIfNeeded();
+        if (refreshed) {
+          res = await http.post(Uri.parse('$kApiBase$path'),
+              headers: _headers, body: jsonEncode(body))
+              .timeout(const Duration(seconds: 15));
+        }
+      }
       return _handle(res);
     } on SocketException {
       throw const ApiException('No internet connection.');
