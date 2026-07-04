@@ -79,6 +79,37 @@ class _MorningScreenState extends State<MorningScreen> {
             SliverPadding(
               padding: const EdgeInsets.all(16),
               sliver: SliverList(delegate: SliverChildListDelegate([
+                // ── System alerts (platform owner only) ──
+                ...((_brief['system_alerts'] as List? ?? [])
+                    .cast<Map<String, dynamic>>()
+                    .map((a) => Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF2F2),
+                            border: Border.all(color: const Color(0xFFDC2626)),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            const Icon(Icons.warning_amber_rounded,
+                                color: Color(0xFFDC2626), size: 22),
+                            const SizedBox(width: 10),
+                            Expanded(child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('SYSTEM CRITICAL · ${a['source'] ?? ''} · ×${a['count'] ?? 1}',
+                                      style: const TextStyle(fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFFDC2626),
+                                          letterSpacing: 0.5)),
+                                  const SizedBox(height: 3),
+                                  Text('${a['message'] ?? ''}',
+                                      maxLines: 2, overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 13,
+                                          fontWeight: FontWeight.w600, color: kTextDark)),
+                                ])),
+                          ]),
+                        ))),
                 // Sales strip
                 _SalesStrip(data: _brief['sales']),
                 const SizedBox(height: 12),
