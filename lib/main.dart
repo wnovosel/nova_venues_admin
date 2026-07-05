@@ -9,6 +9,11 @@ import 'screens/inbox/inbox_screen.dart';
 import 'screens/events/events_screen.dart';
 import 'screens/rentals/rentals_screen.dart';
 import 'screens/marketing/marketing_screen.dart';
+import 'screens/hiring/hiring_screen.dart';
+import 'screens/vendors/vendors_screen.dart';
+import 'screens/wineclub/wineclub_screen.dart';
+import 'screens/chathub/chathub_screen.dart';
+import 'screens/phone/phone_screen.dart';
 import 'screens/calendar/calendar_screen.dart';
 
 void main() {
@@ -67,10 +72,16 @@ class _AdminShellState extends State<_AdminShell> {
     RentalsScreen(),
     CalendarScreen(),
     MarketingScreen(),
+    HiringScreen(),
+    VendorsScreen(),
+    WineClubScreen(),
+    ChatHubScreen(),
+    PhoneScreen(),
   ];
 
   static const _titles = [
     'Morning Brief', 'Inbox', 'Events', 'Rentals', 'Calendar', 'Marketing',
+    'Hiring', 'Vendors', 'Wine Club', 'Chat Hub', 'Phone Assistant',
   ];
 
   @override
@@ -177,12 +188,12 @@ class _NavDrawer extends StatelessWidget {
             // Operations
             _Section('Operations', [
               _Item(Icons.confirmation_num_outlined, 'Events & Ticketing', 2),
-              _Item(Icons.storefront_outlined, 'Vendors', -1),
+              _Item(Icons.storefront_outlined, 'Vendors', 7),
               _Item(Icons.home_work_outlined, 'Rentals', 3),
-              _Item(Icons.people_outline, 'Hiring', -1),
+              _Item(Icons.people_outline, 'Hiring', 6),
               _Item(Icons.music_note_outlined, 'Musicians', -1),
               _Item(Icons.calendar_month_outlined, 'Calendar', 4),
-              _Item(Icons.wine_bar_outlined, 'Wine Club', -1),
+              _Item(Icons.wine_bar_outlined, 'Wine Club', 8),
               _Item(Icons.restaurant_menu_outlined, 'Menus', -1),
               _Item(Icons.store_outlined, 'Store', -1),
             ]),
@@ -191,8 +202,8 @@ class _NavDrawer extends StatelessWidget {
             _Section('Marketing & Growth', [
               _Item(Icons.campaign_outlined, 'Marketing', 5),
               _Item(Icons.camera_alt_outlined, 'Snap & Post', 5),
-              _Item(Icons.chat_outlined, 'Chat Hub', -1),
-              _Item(Icons.phone_outlined, 'Phone Assistant', -1),
+              _Item(Icons.chat_outlined, 'Chat Hub', 9),
+              _Item(Icons.phone_outlined, 'Phone Assistant', 10),
               _Item(Icons.card_giftcard_outlined, 'Gift Cards', -1),
               _Item(Icons.star_outline, 'Loyalty', -1),
             ]),

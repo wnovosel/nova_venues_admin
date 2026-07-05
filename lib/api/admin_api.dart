@@ -162,6 +162,54 @@ class AdminApiClient {
   Future<Map<String, dynamic>> composeEmail(String to, String subject, String body) =>
       _post('/api/v1/admin-inbox/compose', {'to': to, 'subject': subject, 'body': body});
 
+  // ── Hiring ────────────────────────────────────────────────────────────────
+  Future<Map<String, dynamic>> getHiring([String status = 'new']) =>
+      _get('/api/v1/admin/hiring?status=$status');
+  Future<Map<String, dynamic>> getHiringDetail(String id) =>
+      _get('/api/v1/admin/hiring/$id');
+  Future<Map<String, dynamic>> setHiringStatus(String id, String status) =>
+      _post('/api/v1/admin/hiring/$id/status', {'status': status});
+  Future<Map<String, dynamic>> setHiringNotes(String id, String notes) =>
+      _post('/api/v1/admin/hiring/$id/notes', {'notes': notes});
+
+  // ── Vendors (module) ──────────────────────────────────────────────────────
+  Future<Map<String, dynamic>> getVendors([String status = 'pending']) =>
+      _get('/api/v1/admin/vendors?status=$status');
+  Future<Map<String, dynamic>> getVendorDetail(String partyId) =>
+      _get('/api/v1/admin/vendors/$partyId');
+
+  Future<Map<String, dynamic>> setVendorStatus(String id, String status) =>
+      _post('/api/v1/admin/dashboard/vendor/$id/status', {'status': status});
+
+  // ── Wine Club ─────────────────────────────────────────────────────────────
+  Future<Map<String, dynamic>> getWineClub() =>
+      _get('/api/v1/admin/club');
+  Future<Map<String, dynamic>> runClubCharge(int clubId, {int? amountCents}) =>
+      _post('/api/v1/admin/club/run',
+          {'club_id': clubId, if (amountCents != null) 'amount_cents': amountCents});
+
+  // ── Chat Hub ──────────────────────────────────────────────────────────────
+  Future<Map<String, dynamic>> getChatHub() =>
+      _get('/api/v1/admin/chat');
+  Future<Map<String, dynamic>> getChatLogs({int limit = 200}) =>
+      _get('/api/v1/admin/chat/logs?limit=$limit');
+  Future<Map<String, dynamic>> addFaq(String keyword, String question, String answer) =>
+      _post('/api/v1/admin/chat/faq',
+          {'keyword': keyword, 'question': question, 'answer': answer});
+  Future<Map<String, dynamic>> updateFaq(int id, String keyword, String question, String answer) =>
+      _post('/api/v1/admin/chat/faq/$id/update',
+          {'keyword': keyword, 'question': question, 'answer': answer});
+  Future<Map<String, dynamic>> toggleFaq(int id, bool active) =>
+      _post('/api/v1/admin/chat/faq/$id/toggle', {'active': active});
+  Future<Map<String, dynamic>> deleteFaq(int id) =>
+      _post('/api/v1/admin/chat/faq/$id/delete', {});
+
+  // ── Phone Assistant ───────────────────────────────────────────────────────
+  Future<Map<String, dynamic>> getPhone() =>
+      _get('/api/v1/admin/phone');
+  Future<Map<String, dynamic>> savePhoneSettings(Map<String, dynamic> settings) =>
+      _post('/api/v1/admin/phone/settings', settings);
+
   // ── Events ────────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getEvents() =>
