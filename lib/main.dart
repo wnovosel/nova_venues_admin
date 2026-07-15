@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import 'design_system/nova_app_shell.dart';
 import 'design_system/nova_components.dart';
+import 'design_system/nova_navigation_shell.dart';
 import 'models/app_provider.dart';
 import 'screens/login_screen.dart';
 import 'theme/app_theme.dart';
@@ -25,7 +25,9 @@ void main() {
 
 class NovaAdminApp extends StatelessWidget {
   const NovaAdminApp({super.key, this.home});
+
   final Widget? home;
+
   @override
   Widget build(BuildContext context) {
     final appearance = context.watch<AppearanceController>();
@@ -42,6 +44,7 @@ class NovaAdminApp extends StatelessWidget {
 
 class AppRoot extends StatelessWidget {
   const AppRoot({super.key});
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
