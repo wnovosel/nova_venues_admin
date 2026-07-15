@@ -130,7 +130,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
     final unhandled = messages.where((m) => m['handled_at'] == null).length;
 
     return Scaffold(
-      backgroundColor: kBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Inbox', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
