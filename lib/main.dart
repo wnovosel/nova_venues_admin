@@ -8,6 +8,7 @@ import 'screens/morning/morning_screen.dart';
 import 'screens/inbox/inbox_screen.dart';
 import 'screens/events/events_screen.dart';
 import 'screens/rentals/rentals_screen.dart';
+import 'screens/reservations/reservations_screen.dart';
 import 'screens/marketing/marketing_screen.dart';
 import 'screens/hiring/hiring_screen.dart';
 import 'screens/vendors/vendors_screen.dart';
@@ -77,11 +78,13 @@ class _AdminShellState extends State<_AdminShell> {
     WineClubScreen(),
     ChatHubScreen(),
     PhoneScreen(),
+    ReservationsScreen(),
   ];
 
   static const _titles = [
     'Morning Brief', 'Inbox', 'Events', 'Rentals', 'Calendar', 'Marketing',
     'Hiring', 'Vendors', 'Wine Club', 'Chat Hub', 'Phone Assistant',
+    'Reservations',
   ];
 
   @override
@@ -188,6 +191,7 @@ class _NavDrawer extends StatelessWidget {
             // Operations
             _Section('Operations', [
               _Item(Icons.confirmation_num_outlined, 'Events & Ticketing', 2),
+              _Item(Icons.table_bar_outlined, 'Reservations', 11),
               _Item(Icons.storefront_outlined, 'Vendors', 7),
               _Item(Icons.home_work_outlined, 'Rentals', 3),
               _Item(Icons.people_outline, 'Hiring', 6),

@@ -329,6 +329,20 @@ class AdminApiClient {
     if (_token != null) 'Authorization': 'Bearer $_token',
   };
 
+  // ── Reservations (module, 2026-07-14) ───────────────────────────────────
+  Future<Map<String, dynamic>> getReservations([String? day]) =>
+      _get('/api/v1/admin/reservations${day != null ? '?day=$day' : ''}');
+  Future<Map<String, dynamic>> getUpcomingReservations() =>
+      _get('/api/v1/admin/reservations/upcoming');
+  Future<Map<String, dynamic>> setReservationStatus(int id, String status) =>
+      _post('/api/v1/admin/reservations/$id/status', {'status': status});
+  Future<Map<String, dynamic>> chargeNoShow(int id) =>
+      _post('/api/v1/admin/reservations/$id/charge-noshow', {});
+  Future<Map<String, dynamic>> getReservationSlots(int experienceId, String date) =>
+      _get('/api/v1/admin/reservations/slots?experience_id=$experienceId&date=$date');
+  Future<Map<String, dynamic>> createReservation(Map<String, dynamic> data) =>
+      _post('/api/v1/admin/reservations/create', data);
+
   Future<Map<String, dynamic>> _get(String path) async {
     try {
       // Proactive: refresh BEFORE the request if the token is stale — cheaper
