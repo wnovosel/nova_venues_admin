@@ -1,0 +1,103 @@
+project: nova_venues_admin
+branch: feature/nova-ui-foundation
+design_system_version: 1
+
+foundation:
+  status: pending
+  owns:
+    - lib/design_system/**
+    - lib/theme/**
+    - app shell
+    - navigation
+    - theme persistence
+  requirements:
+    - light_dark_system_modes
+    - persisted_theme_preference
+    - centralized_tokens
+    - shared_loading_empty_error_states
+    - no_feature_screen_redesign_in_foundation_task
+
+gold_standard_screens:
+  - id: today
+    current_file: lib/screens/morning/morning_screen.dart
+    target_name: Today
+    status: pending
+    patterns:
+      - metric_strip
+      - operational_timeline
+      - needs_attention_queue
+      - upcoming_events
+      - recent_activity
+  - id: events
+    current_file: lib/screens/events/events_screen.dart
+    status: pending
+    patterns:
+      - search
+      - filter
+      - event_summary
+      - status_badges
+      - progress
+      - detail_navigation
+  - id: inbox
+    current_file: lib/screens/inbox/inbox_screen.dart
+    status: pending
+    patterns:
+      - category_tabs
+      - work_queue_rows
+      - inline_actions
+      - unread_badges
+      - communication_preview
+
+migration_batches:
+  - id: operations_a
+    status: blocked_by_gold_standard
+    screens:
+      - rentals
+      - reservations
+    rules:
+      - preserve_all_existing_fields_actions_and_api_calls
+      - reuse_gold_standard_components
+      - do_not_modify_core_navigation
+  - id: operations_b
+    status: blocked_by_gold_standard
+    screens:
+      - vendors
+      - hiring
+    rules:
+      - compact_review_queues
+      - inline_primary_actions
+      - confirmation_for_destructive_actions
+  - id: growth
+    status: blocked_by_gold_standard
+    screens:
+      - marketing
+      - wineclub
+      - chathub
+      - phone
+    rules:
+      - media_only_when_functionally_relevant
+      - structured_intelligence_blocks
+      - no_decorative_fantasy_styling
+  - id: workflow
+    status: blocked_by_gold_standard
+    screens:
+      - calendar
+      - settings
+      - appearance
+    rules:
+      - fast_navigation
+      - clear_date_and_status_hierarchy
+      - immediate_theme_switching
+
+qa_batch:
+  status: blocked_by_all_migrations
+  checks:
+    - hardcoded_color_scan
+    - duplicate_component_scan
+    - light_dark_consistency
+    - narrow_phone_overflow
+    - text_scaling
+    - accessibility_contrast
+    - navigation_state_accuracy
+    - flutter_analyze
+    - flutter_test
