@@ -3,7 +3,7 @@ branch: feature/nova-ui-foundation
 design_system_version: 1
 
 foundation:
-  status: pending
+  status: completed
   owns:
     - lib/design_system/**
     - lib/theme/**
