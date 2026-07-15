@@ -77,22 +77,60 @@ class _VendorsScreenState extends State<VendorsScreen> with SingleTickerProvider
               final v = apps[i];
               final name = (v['business_name'] ?? v['name'] ?? 'Vendor').toString();
               final st = (v['status'] ?? 'pending').toString();
-              return ListTile(
-                leading: CircleAvatar(backgroundColor: kWarning.withOpacity(.12),
-                    child: const Icon(Icons.storefront, color: kWarning, size: 20)),
-                title: Text(name, style: const TextStyle(fontWeight: FontWeight.w700, color: kTextDark)),
-                subtitle: Text((v['event_name'] ?? v['category'] ?? v['email'] ?? '').toString(),
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-                trailing: st == 'pending'
-                  ? Row(mainAxisSize: MainAxisSize.min, children: [
-                      IconButton(icon: const Icon(Icons.check_circle, color: kSuccess),
-                          onPressed: () => _setStatus(v, 'approved')),
-                      IconButton(icon: const Icon(Icons.cancel, color: kError),
-                          onPressed: () => _setStatus(v, 'declined')),
-                    ])
-                  : Text(st.toUpperCase(), style: const TextStyle(
-                      fontSize: 11, fontWeight: FontWeight.w800, color: kTextMuted)),
-                onTap: () => _openDetail(v),
+              // 2026-07-14 depth pass: the admin list API ships per-event
+              // arrays (event_names / vae_statuses / vae_paid) — surface them
+              // as chips instead of a single opaque line.
+              final evNames = (v['event_names'] as List? ?? []);
+              final evStatuses = (v['vae_statuses'] as List? ?? []);
+              final evPaid = (v['vae_paid'] as List? ?? []);
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                child: Material(
+                  color: kSurface,
+                  borderRadius: BorderRadius.circular(14),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => _openDetail(v),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: kBorder),
+                      ),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Expanded(child: Text(name, style: const TextStyle(
+                              fontWeight: FontWeight.w700, fontSize: 14.5, color: kTextDark),
+                              overflow: TextOverflow.ellipsis)),
+                          if (st == 'pending') ...[
+                            IconButton(visualDensity: VisualDensity.compact,
+                                icon: const Icon(Icons.check_circle, color: kSuccess),
+                                onPressed: () => _setStatus(v, 'approved')),
+                            IconButton(visualDensity: VisualDensity.compact,
+                                icon: const Icon(Icons.cancel, color: kError),
+                                onPressed: () => _setStatus(v, 'declined')),
+                          ] else
+                            _chip(st, st == 'approved' ? kSuccess : (st == 'declined' ? kError : kTextMuted)),
+                        ]),
+                        Text((v['category'] ?? v['email'] ?? '').toString(),
+                            style: const TextStyle(fontSize: 12, color: kTextMuted),
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                        if (evNames.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Wrap(spacing: 6, runSpacing: 6, children: [
+                            for (var j = 0; j < evNames.length; j++)
+                              if (evNames[j] != null)
+                                _eventChip(
+                                  evNames[j].toString(),
+                                  j < evStatuses.length ? (evStatuses[j] ?? 'pending').toString() : 'pending',
+                                  j < evPaid.length && evPaid[j] == true,
+                                ),
+                          ]),
+                        ],
+                      ]),
+                    ),
+                  ),
+                ),
               );
             }))),
     ]);
@@ -114,8 +152,12 @@ class _VendorsScreenState extends State<VendorsScreen> with SingleTickerProvider
               style: const TextStyle(fontWeight: FontWeight.w700, color: kTextDark)),
           subtitle: Text(_fmt(e['event_date']) +
               (total.isNotEmpty ? '  -  ' + spots + '/' + total + ' spots open' : '')),
-          trailing: Text('x' + (e['vendor_count'] ?? e['booked'] ?? 0).toString(),
-              style: const TextStyle(fontWeight: FontWeight.w800, color: kTextDark)),
+          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+            Text('x' + (e['vendor_count'] ?? e['booked'] ?? 0).toString(),
+                style: const TextStyle(fontWeight: FontWeight.w800, color: kTextDark)),
+            const Icon(Icons.chevron_right, color: kTextMuted, size: 20),
+          ]),
+          onTap: () => _openRoster(e),
         );
       }));
   }
@@ -137,9 +179,11 @@ class _VendorsScreenState extends State<VendorsScreen> with SingleTickerProvider
   void _openDetail(Map<String, dynamic> v) async {
     final pid = (v['party_id'] ?? v['id'] ?? '').toString();
     Map<String, dynamic> detail = v;
+    List<Map<String, dynamic>> bookings = [];
     try {
       final res = await context.read<AppProvider>().api.getVendorDetail(pid);
       detail = (res['vendor'] as Map<String, dynamic>? ?? v);
+      bookings = (res['bookings'] as List? ?? []).cast<Map<String, dynamic>>();
     } catch (_) {}
     if (!mounted) return;
     showModalBottomSheet(
@@ -152,8 +196,29 @@ class _VendorsScreenState extends State<VendorsScreen> with SingleTickerProvider
             Text((detail['business_name'] ?? detail['name'] ?? 'Vendor').toString(),
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: kTextDark)),
             const SizedBox(height: 10),
+            if (bookings.isNotEmpty) ...[
+              const Padding(padding: EdgeInsets.only(bottom: 6),
+                child: Text('EVENTS', style: TextStyle(fontSize: 11,
+                    fontWeight: FontWeight.w800, letterSpacing: .8, color: kTextMuted))),
+              for (final b in bookings)
+                Padding(padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(children: [
+                    Expanded(child: Text(
+                        (b['event_name'] ?? b['name'] ?? 'Event #' + (b['event_id'] ?? b['vendor_event_id'] ?? '?').toString()).toString(),
+                        style: const TextStyle(fontSize: 13.5, color: kTextDark))),
+                    if (b['payment_paid'] == true)
+                      const Padding(padding: EdgeInsets.only(right: 6),
+                        child: Icon(Icons.attach_money, size: 15, color: kSuccess)),
+                    _chip((b['status'] ?? 'pending').toString(),
+                        (b['status'] == 'approved' || b['status'] == 'confirmed') ? kSuccess
+                        : b['status'] == 'declined' ? kError : kWarning),
+                  ])),
+              const Padding(padding: EdgeInsets.only(top: 4, bottom: 12),
+                child: Text('Per-event approval and payment links: use the web review page.',
+                    style: TextStyle(fontSize: 11.5, color: kTextMuted, fontStyle: FontStyle.italic))),
+            ],
             for (final k in ['name', 'email', 'phone', 'category', 'products',
-                             'website', 'status', 'event_name', 'notes'])
+                             'website', 'status', 'notes'])
               if ((detail[k] ?? '').toString().isNotEmpty)
                 Padding(padding: const EdgeInsets.only(bottom: 8),
                   child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -163,6 +228,79 @@ class _VendorsScreenState extends State<VendorsScreen> with SingleTickerProvider
                         style: const TextStyle(fontSize: 14, color: kTextDark))),
                   ])),
             const SizedBox(height: 20),
+          ])),
+    );
+  }
+
+  Widget _chip(String label, Color color) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+            color: color.withOpacity(.12), borderRadius: BorderRadius.circular(20)),
+        child: Text(label,
+            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: color)),
+      );
+
+  Widget _eventChip(String name, String status, bool paid) {
+    final c = (status == 'approved' || status == 'confirmed') ? kSuccess
+        : status == 'declined' ? kError : kWarning;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: c.withOpacity(.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: c.withOpacity(.35)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Text(name, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: c)),
+        if (paid) ...[
+          const SizedBox(width: 3),
+          Icon(Icons.attach_money, size: 11, color: c),
+        ],
+      ]),
+    );
+  }
+
+  void _openRoster(Map<String, dynamic> e) async {
+    final eid = (e['id'] ?? e['event_id'] ?? '').toString();
+    if (eid.isEmpty) return;
+    List<Map<String, dynamic>> roster = [];
+    try {
+      final res = await context.read<AppProvider>().api.getVendorEventRoster(eid);
+      roster = (res['roster'] as List? ?? []).cast<Map<String, dynamic>>();
+    } catch (_) {}
+    if (!mounted) return;
+    showModalBottomSheet(
+      context: context, isScrollControlled: true, backgroundColor: kSurface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: .55, maxChildSize: .92, expand: false,
+        builder: (_, ctrl) => ListView(controller: ctrl, padding: const EdgeInsets.all(20),
+          children: [
+            Text((e['name'] ?? e['event_name'] ?? 'Event').toString() + ' — roster',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: kTextDark)),
+            const SizedBox(height: 12),
+            if (roster.isEmpty)
+              const Text('No vendors booked yet.', style: TextStyle(color: kTextMuted))
+            else
+              for (final r in roster)
+                Padding(padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(children: [
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text((r['business_name'] ?? r['vendor_name'] ?? r['name'] ?? 'Vendor').toString(),
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: kTextDark)),
+                      if ((r['spot'] ?? r['spot_number'] ?? '').toString().isNotEmpty)
+                        Text('Spot ' + (r['spot'] ?? r['spot_number']).toString(),
+                            style: const TextStyle(fontSize: 11.5, color: kTextMuted)),
+                    ])),
+                    if (r['payment_paid'] == true || r['paid'] == true)
+                      const Padding(padding: EdgeInsets.only(right: 6),
+                        child: Icon(Icons.attach_money, size: 15, color: kSuccess)),
+                    _chip((r['status'] ?? 'pending').toString(),
+                        (r['status'] == 'approved' || r['status'] == 'confirmed') ? kSuccess
+                        : r['status'] == 'declined' ? kError : kWarning),
+                  ])),
+            const SizedBox(height: 16),
           ])),
     );
   }

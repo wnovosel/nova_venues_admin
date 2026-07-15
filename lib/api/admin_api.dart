@@ -329,6 +329,9 @@ class AdminApiClient {
     if (_token != null) 'Authorization': 'Bearer $_token',
   };
 
+  Future<Map<String, dynamic>> getVendorEventRoster(String eventId) =>
+      _get('/api/v1/admin/vendors/events/$eventId/roster');
+
   // ── Reservations (module, 2026-07-14) ───────────────────────────────────
   Future<Map<String, dynamic>> getReservations([String? day]) =>
       _get('/api/v1/admin/reservations${day != null ? '?day=$day' : ''}');
