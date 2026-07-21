@@ -3,23 +3,19 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 abstract final class NovaColors {
-  static const burgundy = Color(0xFF8E2434);
-  static const burgundyDark = Color(0xFFB94A5B);
-  static const plum = Color(0xFF4A1831);
-  static const rose = Color(0xFFE7A6AF);
-  static const gold = Color(0xFFD8A94B);
-  static const lightCanvas = Color(0xFFF6F3F1);
+  static const fallbackPrimary = Color(0xFF8E2434);
+  static const lightCanvas = Color(0xFFF6F4F2);
   static const lightSurface = Color(0xFFFFFFFF);
-  static const lightSurfaceSubtle = Color(0xFFF0EAE7);
-  static const lightText = Color(0xFF21191C);
-  static const lightMuted = Color(0xFF74696D);
-  static const lightBorder = Color(0xFFE5DDDA);
-  static const darkCanvas = Color(0xFF110D0F);
-  static const darkSurface = Color(0xFF1B1518);
-  static const darkSurfaceSubtle = Color(0xFF261D21);
-  static const darkText = Color(0xFFF8F1F3);
-  static const darkMuted = Color(0xFFB9ACB0);
-  static const darkBorder = Color(0xFF3A2C31);
+  static const lightSurfaceSubtle = Color(0xFFF0ECE9);
+  static const lightText = Color(0xFF211D1F);
+  static const lightMuted = Color(0xFF746D70);
+  static const lightBorder = Color(0xFFE5DFDC);
+  static const darkCanvas = Color(0xFF111011);
+  static const darkSurface = Color(0xFF1B191A);
+  static const darkSurfaceSubtle = Color(0xFF272425);
+  static const darkText = Color(0xFFF8F4F5);
+  static const darkMuted = Color(0xFFB9B1B4);
+  static const darkBorder = Color(0xFF3A3537);
   static const success = Color(0xFF2F8B67);
   static const warning = Color(0xFFD08022);
   static const critical = Color(0xFFC74747);
@@ -62,20 +58,24 @@ abstract final class NovaElevation {
   static const none = 0.0;
   static const raised = 3.0;
   static const overlay = 12.0;
-  static const lightShadow = Color(0x160E0710);
+  static const lightShadow = Color(0x16000000);
   static const darkShadow = Color(0x66000000);
 }
 
 abstract final class NovaTypography {
   static const family = 'Roboto';
   static const display = TextStyle(fontSize: 32, height: 1.08, fontWeight: FontWeight.w800, letterSpacing: -0.8);
-  static const heading = TextStyle(fontSize: 19, height: 1.2, fontWeight: FontWeight.w750, letterSpacing: -0.25);
+  static const heading = TextStyle(fontSize: 19, height: 1.2, fontWeight: FontWeight.w700, letterSpacing: -0.25);
   static const body = TextStyle(fontSize: 14, height: 1.45, fontWeight: FontWeight.w400);
-  static const label = TextStyle(fontSize: 12, height: 1.25, fontWeight: FontWeight.w650, letterSpacing: .15);
+  static const label = TextStyle(fontSize: 12, height: 1.25, fontWeight: FontWeight.w600, letterSpacing: .15);
   static const data = TextStyle(fontSize: 26, height: 1.05, fontWeight: FontWeight.w800, letterSpacing: -.5, fontFeatures: [FontFeature.tabularFigures()]);
 }
 
-ThemeData buildAdminTheme({Brightness brightness = Brightness.light}) {
+ThemeData buildAdminTheme({
+  Brightness brightness = Brightness.light,
+  Color primaryColor = NovaColors.fallbackPrimary,
+  Color? secondaryColor,
+}) {
   final dark = brightness == Brightness.dark;
   final canvas = dark ? NovaColors.darkCanvas : NovaColors.lightCanvas;
   final surface = dark ? NovaColors.darkSurface : NovaColors.lightSurface;
@@ -83,13 +83,14 @@ ThemeData buildAdminTheme({Brightness brightness = Brightness.light}) {
   final text = dark ? NovaColors.darkText : NovaColors.lightText;
   final muted = dark ? NovaColors.darkMuted : NovaColors.lightMuted;
   final border = dark ? NovaColors.darkBorder : NovaColors.lightBorder;
-  final primary = dark ? NovaColors.burgundyDark : NovaColors.burgundy;
+  final primary = _accessibleBrand(primaryColor, dark);
+  final secondary = _accessibleBrand(secondaryColor ?? primaryColor, dark);
 
   final scheme = ColorScheme.fromSeed(
     seedColor: primary,
     brightness: brightness,
     primary: primary,
-    secondary: NovaColors.gold,
+    secondary: secondary,
     surface: surface,
     error: NovaColors.critical,
   ).copyWith(
@@ -128,15 +129,15 @@ ThemeData buildAdminTheme({Brightness brightness = Brightness.light}) {
     dividerColor: border,
     splashFactory: InkSparkle.splashFactory,
     appBarTheme: AppBarTheme(
-      backgroundColor: canvas.withValues(alpha: .86),
+      backgroundColor: canvas.withValues(alpha: .88),
       foregroundColor: text,
       surfaceTintColor: Colors.transparent,
-      elevation: NovaElevation.none,
+      elevation: 0,
       centerTitle: false,
       titleTextStyle: NovaTypography.heading.copyWith(color: text),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: surface.withValues(alpha: .96),
+      backgroundColor: surface.withValues(alpha: .97),
       indicatorColor: primary.withValues(alpha: .14),
       elevation: NovaElevation.overlay,
       shadowColor: dark ? NovaElevation.darkShadow : NovaElevation.lightShadow,
@@ -173,7 +174,7 @@ ThemeData buildAdminTheme({Brightness brightness = Brightness.light}) {
       style: FilledButton.styleFrom(
         minimumSize: const Size(48, 50),
         backgroundColor: primary,
-        foregroundColor: Colors.white,
+        foregroundColor: _onBrand(primary),
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(NovaRadius.input)),
         textStyle: NovaTypography.label.copyWith(fontSize: 14, fontWeight: FontWeight.w800),
@@ -183,7 +184,7 @@ ThemeData buildAdminTheme({Brightness brightness = Brightness.light}) {
       style: ElevatedButton.styleFrom(
         minimumSize: const Size(48, 50),
         backgroundColor: primary,
-        foregroundColor: Colors.white,
+        foregroundColor: _onBrand(primary),
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(NovaRadius.input)),
       ),
@@ -206,7 +207,16 @@ ThemeData buildAdminTheme({Brightness brightness = Brightness.light}) {
   );
 }
 
-const kPrimary = NovaColors.burgundy;
+Color _accessibleBrand(Color color, bool dark) {
+  final hsl = HSLColor.fromColor(color);
+  if (dark && hsl.lightness < .58) return hsl.withLightness(.62).toColor();
+  if (!dark && hsl.lightness > .58) return hsl.withLightness(.48).toColor();
+  return color;
+}
+
+Color _onBrand(Color color) => ThemeData.estimateBrightnessForColor(color) == Brightness.dark ? Colors.white : const Color(0xFF171214);
+
+const kPrimary = NovaColors.fallbackPrimary;
 const kBackground = NovaColors.lightCanvas;
 const kSurface = NovaColors.lightSurface;
 const kTextDark = NovaColors.lightText;
