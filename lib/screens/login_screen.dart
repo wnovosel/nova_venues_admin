@@ -50,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final provider = context.watch<AppProvider>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A), // near-black like logo
+      backgroundColor: NovaColors.darkCanvas, // near-black like logo
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(28),
@@ -73,7 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 'Admin Portal',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF9B1B2B),
+                  color: NovaColors.burgundyDark,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 3,
                 ),
@@ -89,20 +89,20 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'Email',
-                  labelStyle: const TextStyle(color: Color(0xFF888888)),
+                  labelStyle: const TextStyle(color: NovaColors.darkMuted),
                   filled: true,
-                  fillColor: const Color(0xFF1A1A1A),
+                  fillColor: NovaColors.darkSurface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF333333)),
+                    borderSide: const BorderSide(color: NovaColors.darkBorder),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF333333)),
+                    borderSide: const BorderSide(color: NovaColors.darkBorder),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF9B1B2B), width: 1.5),
+                    borderSide: const BorderSide(color: NovaColors.burgundyDark, width: 1.5),
                   ),
                 ),
               ),
@@ -115,25 +115,25 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'Password',
-                  labelStyle: const TextStyle(color: Color(0xFF888888)),
+                  labelStyle: const TextStyle(color: NovaColors.darkMuted),
                   filled: true,
-                  fillColor: const Color(0xFF1A1A1A),
+                  fillColor: NovaColors.darkSurface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF333333)),
+                    borderSide: const BorderSide(color: NovaColors.darkBorder),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF333333)),
+                    borderSide: const BorderSide(color: NovaColors.darkBorder),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF9B1B2B), width: 1.5),
+                    borderSide: const BorderSide(color: NovaColors.burgundyDark, width: 1.5),
                   ),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                      color: const Color(0xFF888888),
+                      color: NovaColors.darkMuted,
                     ),
                     onPressed: () => setState(() => _obscure = !_obscure),
                   ),
@@ -143,7 +143,7 @@ class _LoginScreenState extends State<LoginScreen> {
               if (provider.error != null) ...[
                 const SizedBox(height: 12),
                 Text(provider.error!,
-                    style: const TextStyle(color: Color(0xFF9B1B2B), fontSize: 13)),
+                    style: const TextStyle(color: NovaColors.burgundyDark, fontSize: 13)),
               ],
 
               const SizedBox(height: 16),
@@ -153,10 +153,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 GestureDetector(
                   onTap: _tryBiometric,
                   child: Column(children: [
-                    Icon(Icons.face_unlock_outlined, color: const Color(0xFF9B1B2B), size: 36),
+                    Icon(Icons.face_unlock_outlined, color: NovaColors.burgundyDark, size: 36),
                     const SizedBox(height: 4),
                     const Text('Sign in with Face ID',
-                        style: TextStyle(color: Color(0xFF9B1B2B), fontSize: 13, fontWeight: FontWeight.w600)),
+                        style: TextStyle(color: NovaColors.burgundyDark, fontSize: 13, fontWeight: FontWeight.w600)),
                   ]),
                 ),
 
@@ -170,7 +170,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     await provider.login(_email.text.trim(), _pass.text);
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF9B1B2B),
+                    backgroundColor: NovaColors.burgundyDark,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
