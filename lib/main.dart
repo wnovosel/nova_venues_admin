@@ -31,11 +31,19 @@ class NovaAdminApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appearance = context.watch<AppearanceController>();
+    final provider = context.watch<AppProvider>();
     return MaterialApp(
-      title: 'Nova Venues',
+      title: provider.tenantName,
       debugShowCheckedModeBanner: false,
-      theme: buildAdminTheme(),
-      darkTheme: buildAdminTheme(brightness: Brightness.dark),
+      theme: buildAdminTheme(
+        primaryColor: provider.primaryColor,
+        secondaryColor: provider.secondaryColor,
+      ),
+      darkTheme: buildAdminTheme(
+        brightness: Brightness.dark,
+        primaryColor: provider.primaryColor,
+        secondaryColor: provider.secondaryColor,
+      ),
       themeMode: appearance.themeMode,
       home: home ?? const AppRoot(),
     );
