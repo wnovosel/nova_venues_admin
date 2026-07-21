@@ -18,6 +18,7 @@ dependencies:
   cached_network_image: ^3.4.1
   image_picker: ^1.1.2
   local_auth: ^2.3.0
+  flutter_widget_from_html: ^0.17.2  # renders email body_html incl. inline images
 
 dev_dependencies:
   flutter_test:

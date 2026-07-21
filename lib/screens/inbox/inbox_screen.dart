@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import '../../models/app_provider.dart';
 import '../../theme/app_theme.dart';
 
@@ -539,6 +540,7 @@ class EmailDetailScreen extends StatefulWidget {
 
 class _EmailDetailScreenState extends State<EmailDetailScreen> {
   String? _body;
+  String? _bodyHtml;
   bool _loading = true;
   bool _showReply = false;
   final _replyCtrl = TextEditingController();
@@ -554,7 +556,14 @@ class _EmailDetailScreenState extends State<EmailDetailScreen> {
     try {
       final api = context.read<AppProvider>().api;
       final res = await api.getEmailDetail(widget.email['id']);
-      setState(() { _body = res['email']?['body'] ?? widget.email['snippet'] ?? ''; _loading = false; });
+      setState(() {
+        _body = res['email']?['body'] ?? widget.email['snippet'] ?? '';
+        // body_html carries the full HTML (with inline <img>); backend already
+        // sends it. Render it when present; fall back to plain text otherwise.
+        final h = res['email']?['body_html'];
+        _bodyHtml = (h is String && h.trim().isNotEmpty) ? h : null;
+        _loading = false;
+      });
     } catch (e) {
       setState(() { _body = widget.email['snippet'] ?? ''; _loading = false; });
     }
@@ -629,6 +638,15 @@ class _EmailDetailScreenState extends State<EmailDetailScreen> {
                 padding: EdgeInsets.all(40),
                 child: CircularProgressIndicator(color: kPrimary),
               ))
+            else if (_bodyHtml != null)
+              // Rich HTML body: renders formatting + inline images (network
+              // images load out of the box via fwfh_cached_network_image).
+              HtmlWidget(
+                _bodyHtml!,
+                textStyle: const TextStyle(fontSize: 15, height: 1.6, color: kTextDark),
+                onErrorBuilder: (context, element, error) =>
+                    Text(_body ?? '', style: const TextStyle(fontSize: 15, height: 1.7, color: kTextDark)),
+              )
             else
               Text(_body ?? '', style: const TextStyle(fontSize: 15, height: 1.7, color: kTextDark)),
           ]),
