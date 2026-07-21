@@ -15,6 +15,7 @@ class MorningScreen extends StatefulWidget {
 class _MorningScreenState extends State<MorningScreen> {
   Map<String, dynamic> _brief = {};
   Map<String, dynamic> _dashboard = {};
+  List<Map<String, dynamic>> _events = [];
   bool _loading = true;
   String? _error;
 
@@ -29,19 +30,38 @@ class _MorningScreenState extends State<MorningScreen> {
       _loading = true;
       _error = null;
     });
+
     try {
       final api = context.read<AppProvider>().api;
-      final brief = await api.getMorningData();
-      Map<String, dynamic> dashboard = {};
-      try {
-        dashboard = await api.getDashboard();
-      } catch (error) {
-        debugPrint('Dashboard error: $error');
-      }
+      final results = await Future.wait([
+        api.getMorningData(),
+        api.getDashboard().catchError((_) => <String, dynamic>{}),
+        api.getEvents().catchError((_) => <String, dynamic>{}),
+      ]);
+
+      final eventsResponse = results[2];
+      final rawEvents = (eventsResponse['events'] as List? ?? const []);
+      final now = DateTime.now();
+      final upcoming = rawEvents
+          .whereType<Map>()
+          .map((event) => event.cast<String, dynamic>())
+          .where((event) {
+            final value = event['starts_at'];
+            final date = value is String ? DateTime.tryParse(value)?.toLocal() : null;
+            return date != null && !date.isBefore(now);
+          })
+          .toList()
+        ..sort((a, b) {
+          final ad = DateTime.tryParse('${a['starts_at']}') ?? DateTime(2100);
+          final bd = DateTime.tryParse('${b['starts_at']}') ?? DateTime(2100);
+          return ad.compareTo(bd);
+        });
+
       if (!mounted) return;
       setState(() {
-        _brief = brief;
-        _dashboard = dashboard;
+        _brief = results[0];
+        _dashboard = results[1];
+        _events = upcoming;
         _loading = false;
       });
     } catch (error) {
@@ -54,7 +74,7 @@ class _MorningScreenState extends State<MorningScreen> {
   }
 
   List<Map<String, dynamic>> _list(String key) =>
-      (_dashboard[key] as List? ?? const []).cast<Map<String, dynamic>>();
+      (_dashboard[key] as List? ?? const []).whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
 
   int get _attentionCount =>
       _list('new_hires').length +
@@ -62,6 +82,21 @@ class _MorningScreenState extends State<MorningScreen> {
       _list('voicemails').length +
       _list('new_rentals').length +
       (_brief['system_alerts'] as List? ?? const []).length;
+
+  double get _revenue {
+    final value = _brief['total_revenue_today'] ??
+        _brief['revenue_today'] ??
+        (_brief['sales'] is Map ? (_brief['sales'] as Map)['gross'] : null) ??
+        0;
+    return value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
+  }
+
+  int get _orders {
+    final value = _brief['orders_today'] ??
+        (_brief['sales'] is Map ? (_brief['sales'] as Map)['order_count'] : null) ??
+        0;
+    return value is num ? value.toInt() : int.tryParse('$value') ?? 0;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,9 +126,7 @@ class _MorningScreenState extends State<MorningScreen> {
               ],
             ),
             if (_loading)
-              const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
-              )
+              const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
             else if (_error != null)
               SliverFillRemaining(
                 child: Center(
@@ -102,11 +135,9 @@ class _MorningScreenState extends State<MorningScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.cloud_off_rounded,
-                            size: 44, color: scheme.error),
+                        Icon(Icons.cloud_off_rounded, size: 44, color: scheme.error),
                         const SizedBox(height: 12),
-                        Text('Could not load the company pulse',
-                            style: theme.textTheme.titleMedium),
+                        Text('Could not load the company pulse', style: theme.textTheme.titleMedium),
                         const SizedBox(height: 6),
                         Text(_error!, textAlign: TextAlign.center),
                         const SizedBox(height: 18),
@@ -133,16 +164,16 @@ class _MorningScreenState extends State<MorningScreen> {
                     ),
                     const SizedBox(height: 16),
                     ...((_brief['system_alerts'] as List? ?? const [])
-                        .cast<Map<String, dynamic>>()
+                        .whereType<Map>()
                         .map((alert) => Padding(
                               padding: const EdgeInsets.only(bottom: 10),
-                              child: _SystemAlert(alert: alert),
+                              child: _SystemAlert(alert: alert.cast<String, dynamic>()),
                             ))),
                     _PulseMetrics(
-                      sales: (_brief['sales'] as Map?)?.cast<String, dynamic>(),
-                      events: (_brief['upcoming_events'] as List? ?? const []).length,
+                      revenue: _revenue,
+                      orders: _orders,
+                      events: _events.length,
                       attention: _attentionCount,
-                      dashboard: _dashboard,
                     ),
                     const SizedBox(height: 22),
                     _SectionHeading(
@@ -161,9 +192,7 @@ class _MorningScreenState extends State<MorningScreen> {
                         icon: Icons.home_work_outlined,
                         color: const Color(0xFF6B4FBB),
                         items: _list('new_rentals'),
-                        emptyText: 'No new rental requests',
-                        builder: (item) =>
-                            _RentalCard(item: item, onRefresh: _load),
+                        onAction: _rentalAction,
                       ),
                       const SizedBox(height: 10),
                       _ActionSection(
@@ -171,9 +200,7 @@ class _MorningScreenState extends State<MorningScreen> {
                         icon: Icons.storefront_outlined,
                         color: kWarning,
                         items: _list('new_vendors'),
-                        emptyText: 'No new vendor requests',
-                        builder: (item) =>
-                            _VendorCard(item: item, onRefresh: _load),
+                        onAction: _vendorAction,
                       ),
                       const SizedBox(height: 10),
                       _ActionSection(
@@ -181,9 +208,7 @@ class _MorningScreenState extends State<MorningScreen> {
                         icon: Icons.voicemail_rounded,
                         color: scheme.primary,
                         items: _list('voicemails'),
-                        emptyText: 'No new voicemails',
-                        builder: (item) =>
-                            _VoicemailCard(item: item, onRefresh: _load),
+                        onAction: _voicemailAction,
                       ),
                       const SizedBox(height: 10),
                       _ActionSection(
@@ -191,9 +216,7 @@ class _MorningScreenState extends State<MorningScreen> {
                         icon: Icons.person_add_alt_1_rounded,
                         color: kSuccess,
                         items: _list('new_hires'),
-                        emptyText: 'No new applications',
-                        builder: (item) =>
-                            _HireCard(item: item, onRefresh: _load),
+                        onAction: _hireAction,
                       ),
                     ],
                     const SizedBox(height: 22),
@@ -203,10 +226,7 @@ class _MorningScreenState extends State<MorningScreen> {
                       icon: Icons.calendar_month_rounded,
                     ),
                     const SizedBox(height: 10),
-                    _UpcomingEvents(
-                      events: (_brief['upcoming_events'] as List? ?? const [])
-                          .cast<Map<String, dynamic>>(),
-                    ),
+                    _UpcomingEvents(events: _events.take(6).toList()),
                   ],
                 ),
               ),
@@ -215,16 +235,35 @@ class _MorningScreenState extends State<MorningScreen> {
       ),
     );
   }
+
+  Future<void> _rentalAction(Map<String, dynamic> item, bool approve) async {
+    final id = '${item['id']}';
+    if (approve) {
+      await context.read<AppProvider>().api.confirmRental(id);
+    } else {
+      await context.read<AppProvider>().api.declineRental(id);
+    }
+    await _load();
+  }
+
+  Future<void> _vendorAction(Map<String, dynamic> item, bool approve) async {
+    await context.read<AppProvider>().api.updateVendorStatus(item['id'], approve ? 'approved' : 'rejected');
+    await _load();
+  }
+
+  Future<void> _voicemailAction(Map<String, dynamic> item, bool approve) async {
+    await context.read<AppProvider>().api.markVoicemailHandled(item['id'] ?? item['call_sid']);
+    await _load();
+  }
+
+  Future<void> _hireAction(Map<String, dynamic> item, bool approve) async {
+    await context.read<AppProvider>().api.updateHireStatus(item['id'], approve ? 'approved' : 'rejected');
+    await _load();
+  }
 }
 
 class _PulseHero extends StatelessWidget {
-  const _PulseHero({
-    required this.greeting,
-    required this.date,
-    required this.tenantName,
-    required this.attentionCount,
-  });
-
+  const _PulseHero({required this.greeting, required this.date, required this.tenantName, required this.attentionCount});
   final String greeting;
   final String date;
   final String tenantName;
@@ -240,71 +279,33 @@ class _PulseHero extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
         gradient: LinearGradient(
-          colors: [
-            scheme.primary,
-            Color.lerp(scheme.primary, scheme.secondary, .74)!,
-          ],
+          colors: [scheme.primary, Color.lerp(scheme.primary, scheme.secondary, .74)!],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.primary.withValues(alpha: .24),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: scheme.primary.withValues(alpha: .24), blurRadius: 28, offset: const Offset(0, 14))],
       ),
       child: Stack(
         children: [
-          Positioned(
-            right: -20,
-            top: -28,
-            child: Icon(Icons.monitor_heart_rounded,
-                size: 132, color: scheme.onPrimary.withValues(alpha: .09)),
-          ),
+          Positioned(right: -20, top: -28, child: Icon(Icons.monitor_heart_rounded, size: 132, color: scheme.onPrimary.withValues(alpha: .09))),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(greeting.toUpperCase(),
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: scheme.onPrimary.withValues(alpha: .72),
-                    letterSpacing: 1.2,
-                    fontWeight: FontWeight.w800,
-                  )),
+              Text(greeting.toUpperCase(), style: theme.textTheme.labelMedium?.copyWith(color: scheme.onPrimary.withValues(alpha: .72), letterSpacing: 1.2, fontWeight: FontWeight.w800)),
               const SizedBox(height: 7),
-              Text('The pulse of $tenantName',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    color: scheme.onPrimary,
-                    fontWeight: FontWeight.w900,
-                  )),
+              Text('The pulse of $tenantName', style: theme.textTheme.headlineSmall?.copyWith(color: scheme.onPrimary, fontWeight: FontWeight.w900)),
               const SizedBox(height: 5),
-              Text(date,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: scheme.onPrimary.withValues(alpha: .78),
-                  )),
+              Text(date, style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onPrimary.withValues(alpha: .78))),
               const SizedBox(height: 22),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                decoration: BoxDecoration(
-                  color: scheme.onPrimary.withValues(alpha: .12),
-                  borderRadius: BorderRadius.circular(16),
-                ),
+                decoration: BoxDecoration(color: scheme.onPrimary.withValues(alpha: .12), borderRadius: BorderRadius.circular(16)),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(clear ? Icons.check_circle : Icons.bolt_rounded,
-                        size: 18, color: scheme.onPrimary),
+                    Icon(clear ? Icons.check_circle : Icons.bolt_rounded, size: 18, color: scheme.onPrimary),
                     const SizedBox(width: 8),
-                    Text(
-                      clear
-                          ? 'Everything is running smoothly'
-                          : '$attentionCount items need attention',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: scheme.onPrimary,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
+                    Text(clear ? 'Everything is running smoothly' : '$attentionCount items need attention', style: theme.textTheme.labelLarge?.copyWith(color: scheme.onPrimary, fontWeight: FontWeight.w800)),
                   ],
                 ),
               ),
@@ -317,24 +318,16 @@ class _PulseHero extends StatelessWidget {
 }
 
 class _PulseMetrics extends StatelessWidget {
-  const _PulseMetrics({
-    required this.sales,
-    required this.events,
-    required this.attention,
-    required this.dashboard,
-  });
-
-  final Map<String, dynamic>? sales;
+  const _PulseMetrics({required this.revenue, required this.orders, required this.events, required this.attention});
+  final double revenue;
+  final int orders;
   final int events;
   final int attention;
-  final Map<String, dynamic> dashboard;
 
   @override
   Widget build(BuildContext context) {
-    final gross = (sales?['gross'] ?? 0).toDouble();
-    final orders = sales?['order_count'] ?? 0;
     final metrics = [
-      ('Revenue', sales?['available'] == true ? '\$${gross.toStringAsFixed(0)}' : '—', Icons.payments_outlined),
+      ('Revenue', '\$${NumberFormat('#,##0').format(revenue)}', Icons.payments_outlined),
       ('Orders', '$orders', Icons.receipt_long_outlined),
       ('Upcoming', '$events', Icons.event_outlined),
       ('Open items', '$attention', Icons.pending_actions_rounded),
@@ -343,12 +336,7 @@ class _PulseMetrics extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: metrics.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 1.65,
-      ),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1.65),
       itemBuilder: (context, index) {
         final metric = metrics[index];
         return Card(
@@ -359,14 +347,9 @@ class _PulseMetrics extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(metric.$3, size: 20,
-                    color: Theme.of(context).colorScheme.primary),
-                Text(metric.$2,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        )),
-                Text(metric.$1,
-                    style: Theme.of(context).textTheme.bodySmall),
+                Icon(metric.$3, size: 20, color: Theme.of(context).colorScheme.primary),
+                Text(metric.$2, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
+                Text(metric.$1, style: Theme.of(context).textTheme.bodySmall),
               ],
             ),
           ),
@@ -386,26 +369,9 @@ class _SectionHeading extends StatelessWidget {
   Widget build(BuildContext context) => Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: .12),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: Theme.of(context).colorScheme.primary),
-          ),
+          Container(width: 42, height: 42, decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary.withValues(alpha: .12), borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: Theme.of(context).colorScheme.primary)),
           const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 2),
-                Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ),
-          ),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: Theme.of(context).textTheme.titleLarge), const SizedBox(height: 2), Text(subtitle, style: Theme.of(context).textTheme.bodySmall)])),
         ],
       );
 }
@@ -419,14 +385,89 @@ class _SystemAlert extends StatelessWidget {
         margin: EdgeInsets.zero,
         child: ListTile(
           leading: const Icon(Icons.warning_amber_rounded, color: kError),
-          title: Text('${alert['source'] ?? 'System'} alert',
-              style: const TextStyle(fontWeight: FontWeight.w800)),
-          subtitle: Text('${alert['message'] ?? ''}', maxLines: 2,
-              overflow: TextOverflow.ellipsis),
-          trailing: Text('×${alert['count'] ?? 1}',
-              style: const TextStyle(color: kError, fontWeight: FontWeight.w800)),
+          title: Text('${alert['source'] ?? 'System'} alert', style: const TextStyle(fontWeight: FontWeight.w800)),
+          subtitle: Text('${alert['message'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis),
+          trailing: Text('×${alert['count'] ?? 1}', style: const TextStyle(color: kError, fontWeight: FontWeight.w800)),
         ),
       );
+}
+
+class _ActionSection extends StatelessWidget {
+  const _ActionSection({required this.title, required this.icon, required this.color, required this.items, required this.onAction});
+  final String title;
+  final IconData icon;
+  final Color color;
+  final List<Map<String, dynamic>> items;
+  final Future<void> Function(Map<String, dynamic>, bool) onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Column(
+        children: [
+          ListTile(
+            leading: Icon(icon, color: color),
+            title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+            trailing: CircleAvatar(radius: 15, backgroundColor: color.withValues(alpha: .12), child: Text('${items.length}', style: TextStyle(color: color, fontWeight: FontWeight.w800))),
+          ),
+          const Divider(height: 1),
+          ...items.take(5).map((item) => _ActionRow(item: item, color: color, onAction: onAction)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionRow extends StatelessWidget {
+  const _ActionRow({required this.item, required this.color, required this.onAction});
+  final Map<String, dynamic> item;
+  final Color color;
+  final Future<void> Function(Map<String, dynamic>, bool) onAction;
+
+  String get title => '${item['business_name'] ?? item['contact_name'] ?? item['name'] ?? item['from_number'] ?? item['caller'] ?? 'New item'}';
+  String get subtitle => '${item['event_type'] ?? item['vendor_type'] ?? item['position'] ?? item['transcription'] ?? item['message'] ?? item['venue'] ?? ''}';
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: subtitle.isEmpty ? null : Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+        trailing: Wrap(
+          spacing: 4,
+          children: [
+            IconButton(tooltip: 'Pass', onPressed: () => onAction(item, false), icon: const Icon(Icons.close_rounded)),
+            IconButton(tooltip: 'Approve', onPressed: () => onAction(item, true), icon: Icon(Icons.check_rounded, color: color)),
+          ],
+        ),
+      );
+}
+
+class _UpcomingEvents extends StatelessWidget {
+  const _UpcomingEvents({required this.events});
+  final List<Map<String, dynamic>> events;
+
+  @override
+  Widget build(BuildContext context) {
+    if (events.isEmpty) {
+      return const Card(child: Padding(padding: EdgeInsets.all(18), child: Text('No upcoming events found.')));
+    }
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Column(
+        children: events.map((event) {
+          final parsed = DateTime.tryParse('${event['starts_at']}')?.toLocal();
+          final when = parsed == null ? '' : DateFormat('EEE, MMM d • h:mm a').format(parsed);
+          return ListTile(
+            leading: const Icon(Icons.event_rounded),
+            title: Text('${event['title'] ?? 'Event'}', style: const TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: Text([when, event['location']].where((value) => value != null && '$value'.isNotEmpty).join(' · ')),
+            trailing: event['ticket_count'] == null ? null : Text('${event['ticket_count']} tickets'),
+          );
+        }).toList(),
+      ),
+    );
+  }
 }
 
 class _AllClearCard extends StatelessWidget {
@@ -439,278 +480,11 @@ class _AllClearCard extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           child: Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: kSuccess.withValues(alpha: .12),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(Icons.check_rounded, color: kSuccess),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('You are all caught up',
-                        style: TextStyle(fontWeight: FontWeight.w800)),
-                    SizedBox(height: 3),
-                    Text('There are no approvals, calls, or requests waiting.'),
-                  ],
-                ),
-              ),
+              Icon(Icons.check_circle_rounded, color: Theme.of(context).colorScheme.primary, size: 32),
+              const SizedBox(width: 12),
+              const Expanded(child: Text('You are all caught up. There are no outstanding items requiring action.')),
             ],
           ),
         ),
       );
-}
-
-class _ActionSection extends StatelessWidget {
-  const _ActionSection({
-    required this.title,
-    required this.icon,
-    required this.color,
-    required this.items,
-    required this.emptyText,
-    required this.builder,
-  });
-
-  final String title;
-  final IconData icon;
-  final Color color;
-  final List<Map<String, dynamic>> items;
-  final String emptyText;
-  final Widget Function(Map<String, dynamic>) builder;
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) return const SizedBox.shrink();
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: color, size: 19),
-                ),
-                const SizedBox(width: 10),
-                Expanded(child: Text(title,
-                    style: Theme.of(context).textTheme.titleMedium)),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text('${items.length}',
-                      style: TextStyle(color: color, fontWeight: FontWeight.w900)),
-                ),
-              ],
-            ),
-          ),
-          ...items.map((item) => Column(
-                children: [
-                  const Divider(height: 1),
-                  builder(item),
-                ],
-              )),
-        ],
-      ),
-    );
-  }
-}
-
-class _HireCard extends StatelessWidget {
-  const _HireCard({required this.item, required this.onRefresh});
-  final Map<String, dynamic> item;
-  final VoidCallback onRefresh;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: kSuccess.withValues(alpha: .12),
-              child: Text('${item['name'] ?? '?'}'[0].toUpperCase(),
-                  style: const TextStyle(color: kSuccess, fontWeight: FontWeight.w800)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(item['name'] ?? 'Unknown',
-                      style: const TextStyle(fontWeight: FontWeight.w800)),
-                  if (item['position'] != null)
-                    Text('${item['position']}',
-                        style: Theme.of(context).textTheme.bodySmall),
-                ],
-              ),
-            ),
-            TextButton(onPressed: () => _update(context, 'rejected'), child: const Text('Pass')),
-            FilledButton(onPressed: () => _update(context, 'approved'), child: const Text('Interview')),
-          ],
-        ),
-      );
-
-  Future<void> _update(BuildContext context, String status) async {
-    await context.read<AppProvider>().api.updateHireStatus(item['id'], status);
-    onRefresh();
-  }
-}
-
-class _VendorCard extends StatelessWidget {
-  const _VendorCard({required this.item, required this.onRefresh});
-  final Map<String, dynamic> item;
-  final VoidCallback onRefresh;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.storefront_rounded, color: kWarning),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(item['business_name'] ?? 'Unknown',
-                          style: const TextStyle(fontWeight: FontWeight.w800)),
-                      if (item['event_name'] != null)
-                        Text('For ${item['event_name']}',
-                            style: Theme.of(context).textTheme.bodySmall),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                const Spacer(),
-                TextButton(onPressed: () => _update(context, 'rejected'), child: const Text('Decline')),
-                const SizedBox(width: 8),
-                FilledButton(onPressed: () => _update(context, 'approved'), child: const Text('Approve')),
-              ],
-            ),
-          ],
-        ),
-      );
-
-  Future<void> _update(BuildContext context, String status) async {
-    await context.read<AppProvider>().api.updateVendorStatus(item['id'], status);
-    onRefresh();
-  }
-}
-
-class _VoicemailCard extends StatelessWidget {
-  const _VoicemailCard({required this.item, required this.onRefresh});
-  final Map<String, dynamic> item;
-  final VoidCallback onRefresh;
-
-  @override
-  Widget build(BuildContext context) => ListTile(
-        leading: const CircleAvatar(child: Icon(Icons.voicemail_rounded)),
-        title: Text(item['caller_name'] ?? item['from_number'] ?? 'Unknown',
-            style: const TextStyle(fontWeight: FontWeight.w800)),
-        subtitle: item['summary'] == null
-            ? null
-            : Text('${item['summary']}', maxLines: 2, overflow: TextOverflow.ellipsis),
-        trailing: TextButton(
-          onPressed: () async {
-            await context.read<AppProvider>().api.markVoicemailHandled(item['id']);
-            onRefresh();
-          },
-          child: const Text('Done'),
-        ),
-      );
-}
-
-class _RentalCard extends StatelessWidget {
-  const _RentalCard({required this.item, required this.onRefresh});
-  final Map<String, dynamic> item;
-  final VoidCallback onRefresh;
-
-  @override
-  Widget build(BuildContext context) => ListTile(
-        leading: const CircleAvatar(child: Icon(Icons.home_work_outlined)),
-        title: Text(item['contact_name'] ?? 'Unknown',
-            style: const TextStyle(fontWeight: FontWeight.w800)),
-        subtitle: Text(
-          '${item['event_type'] ?? 'Rental'} · ${item['guest_count'] ?? '?'} guests${item['event_date'] == null ? '' : ' · ${_formatDate(item['event_date'])}'}',
-        ),
-        trailing: const Icon(Icons.chevron_right_rounded),
-      );
-}
-
-class _UpcomingEvents extends StatelessWidget {
-  const _UpcomingEvents({required this.events});
-  final List<Map<String, dynamic>> events;
-
-  @override
-  Widget build(BuildContext context) {
-    if (events.isEmpty) {
-      return const Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: EdgeInsets.all(18),
-          child: Text('No upcoming events are scheduled.'),
-        ),
-      );
-    }
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: events.take(6).map((event) => Column(
-              children: [
-                ListTile(
-                  leading: Container(
-                    width: 44,
-                    height: 44,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: .11),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.event_rounded),
-                  ),
-                  title: Text(event['title'] ?? 'Event',
-                      style: const TextStyle(fontWeight: FontWeight.w800)),
-                  subtitle: event['starts_at'] == null
-                      ? null
-                      : Text(_formatDate(event['starts_at'])),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                ),
-                if (event != events.take(6).last) const Divider(height: 1),
-              ],
-            )).toList(),
-      ),
-    );
-  }
-}
-
-String _formatDate(dynamic value) {
-  if (value == null) return '';
-  try {
-    final date = DateTime.parse(value.toString()).toLocal();
-    return DateFormat('MMM d').format(date);
-  } catch (_) {
-    return value.toString();
-  }
 }
