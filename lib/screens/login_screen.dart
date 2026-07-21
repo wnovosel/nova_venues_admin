@@ -73,7 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 'Admin Portal',
                 style: TextStyle(
                   fontSize: 14,
-                  color: NovaColors.burgundyDark,
+                  color: NovaColors.fallbackPrimary,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 3,
                 ),
@@ -102,7 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: NovaColors.burgundyDark, width: 1.5),
+                    borderSide: const BorderSide(color: NovaColors.fallbackPrimary, width: 1.5),
                   ),
                 ),
               ),
@@ -128,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: NovaColors.burgundyDark, width: 1.5),
+                    borderSide: const BorderSide(color: NovaColors.fallbackPrimary, width: 1.5),
                   ),
                   suffixIcon: IconButton(
                     icon: Icon(
@@ -143,7 +143,7 @@ class _LoginScreenState extends State<LoginScreen> {
               if (provider.error != null) ...[
                 const SizedBox(height: 12),
                 Text(provider.error!,
-                    style: const TextStyle(color: NovaColors.burgundyDark, fontSize: 13)),
+                    style: const TextStyle(color: NovaColors.fallbackPrimary, fontSize: 13)),
               ],
 
               const SizedBox(height: 16),
@@ -153,10 +153,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 GestureDetector(
                   onTap: _tryBiometric,
                   child: Column(children: [
-                    Icon(Icons.face_unlock_outlined, color: NovaColors.burgundyDark, size: 36),
+                    Icon(Icons.face_unlock_outlined, color: NovaColors.fallbackPrimary, size: 36),
                     const SizedBox(height: 4),
                     const Text('Sign in with Face ID',
-                        style: TextStyle(color: NovaColors.burgundyDark, fontSize: 13, fontWeight: FontWeight.w600)),
+                        style: TextStyle(color: NovaColors.fallbackPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
                   ]),
                 ),
 
@@ -170,7 +170,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     await provider.login(_email.text.trim(), _pass.text);
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: NovaColors.burgundyDark,
+                    backgroundColor: NovaColors.fallbackPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
