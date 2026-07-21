@@ -220,17 +220,25 @@ class AdminApiClient {
   Future<Map<String, dynamic>> getRentals() =>
       _get('/api/v1/admin/rentals');
 
+  // Backend /admin/rentals/<id>/status REQUIRES a valid status in the body
+  // (one of: pending, confirmed, declined, cancelled, completed) and returns
+  // 400 otherwise. Sending {} made both of these fail — always. Verified
+  // against src/blueprints/mobile_api.py::admin_rental_status.
   Future<Map<String, dynamic>> confirmRental(String id) =>
-      _post('/api/v1/admin/rentals/$id/status', {});
+      _post('/api/v1/admin/rentals/$id/status', {'status': 'confirmed'});
 
   Future<Map<String, dynamic>> declineRental(String id) =>
-      _post('/api/v1/admin/rentals/$id/status', {});
+      _post('/api/v1/admin/rentals/$id/status', {'status': 'declined'});
 
 
   // ── Marketing ─────────────────────────────────────────────────────────────
 
+  // Was wrongly pointed at /admin/brief (the morning brief), which returns no
+  // 'posts' key — so the marketing screen silently rendered an empty queue.
+  // /admin/marketing is the real endpoint and returns {"posts":[...]} with the
+  // exact fields the screen reads. Verified against mobile_api.py::admin_marketing_list.
   Future<Map<String, dynamic>> getMarketingQueue() =>
-      _get('/api/v1/admin/brief');
+      _get('/api/v1/admin/marketing');
 
 
   // ── Dashboard ────────────────────────────────────────────────────────────
