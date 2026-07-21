@@ -2,11 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
+import 'package:fwfh_cached_network_image/fwfh_cached_network_image.dart';
 import '../../models/app_provider.dart';
 import '../../theme/app_theme.dart';
 
 // ── Swipe action config ───────────────────────────────────────────────────────
+
+// Renders <img> in email HTML via cached_network_image (which the app already
+// bundles). Using the core package + this single mixin avoids pulling in
+// just_audio/video/webview — the just_audio mic dependency was failing the iOS
+// archive (needs NSMicrophoneUsageDescription). Email HTML has no audio/video.
+class _EmailHtmlFactory extends WidgetFactory with CachedNetworkImageFactory {}
+
 
 enum SwipeAction { archive, delete, markRead, markUnread, spam, none }
 
@@ -643,6 +651,7 @@ class _EmailDetailScreenState extends State<EmailDetailScreen> {
               // images load out of the box via fwfh_cached_network_image).
               HtmlWidget(
                 _bodyHtml!,
+                factoryBuilder: () => _EmailHtmlFactory(),
                 textStyle: const TextStyle(fontSize: 15, height: 1.6, color: kTextDark),
                 onErrorBuilder: (context, element, error) =>
                     Text(_body ?? '', style: const TextStyle(fontSize: 15, height: 1.7, color: kTextDark)),

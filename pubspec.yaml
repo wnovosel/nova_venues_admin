@@ -18,7 +18,8 @@ dependencies:
   cached_network_image: ^3.4.1
   image_picker: ^1.1.2
   local_auth: ^2.3.0
-  flutter_widget_from_html: ^0.17.2  # renders email body_html incl. inline images
+  flutter_widget_from_html_core: ^0.17.2  # HTML render (no audio/video/webview → no mic requirement)
+  fwfh_cached_network_image: ^0.16.1      # inline <img> via cached_network_image (already a dep)
 
 dev_dependencies:
   flutter_test:
