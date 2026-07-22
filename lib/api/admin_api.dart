@@ -282,6 +282,28 @@ class AdminApiClient {
   Future<Map<String, dynamic>> getEventDetail(int id) =>
       _get('/api/v1/admin/events/$id');
 
+  /// Search customers by name or email. Backend fixed 2026-07-22 — it had
+  /// joined a nonexistent table and 500'd on every call since it was written.
+  Future<Map<String, dynamic>> searchCustomers(String query) =>
+      _get('/api/v1/admin/customers?q=${Uri.encodeQueryComponent(query)}');
+
+  /// All tickets for a customer by email -> {tickets:[...]} with event info.
+  Future<Map<String, dynamic>> getCustomerTickets(String email) =>
+      _get('/api/v1/admin/customers/tickets?email=${Uri.encodeQueryComponent(email)}');
+
+  /// Resend a ticket email via the same sender that delivers at purchase.
+  Future<Map<String, dynamic>> resendTicket(int ticketId) =>
+      _post('/api/v1/admin/tickets/$ticketId/resend', {});
+
+  /// Create (eventId null) or update an event. The backend REQUIRES
+  /// action='publish'|'save_draft' — ambiguous publish state is refused
+  /// because it once force-unpublished events on every save. Dates go as ISO
+  /// starts_at/ends_at strings.
+  Future<Map<String, dynamic>> saveEvent(Map<String, dynamic> fields, {int? eventId}) =>
+      _post(eventId == null
+          ? '/api/v1/admin/events/save'
+          : '/api/v1/admin/events/$eventId/save', fields);
+
   Future<Map<String, dynamic>> cancelEvent(String id) =>
       _post('/api/v1/admin/events/$id/cancel', {});
 

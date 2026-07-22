@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../events/events_screen.dart';
 import '../hiring/hiring_screen.dart';
 import '../inbox/inbox_screen.dart';
+import '../customers/customers_screen.dart';
 import '../marketing/marketing_screen.dart';
 import '../rentals/rentals_screen.dart';
 import '../vendors/vendors_screen.dart';
@@ -162,6 +163,13 @@ class _MorningScreenState extends State<MorningScreen> {
                     onTap: () {
                       Navigator.pop(sheetContext);
                       _open(const EventsScreen());
+                    }),
+                _QuickAction(
+                    label: 'Customers',
+                    icon: Icons.people_alt_outlined,
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _open(const CustomersScreen());
                     }),
                 _QuickAction(
                     label: 'Rentals',

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../models/app_provider.dart';
 import '../../theme/app_theme.dart';
 import 'scan_checkin_screen.dart';
+import 'event_form_screen.dart';
 
 // ── Events List ───────────────────────────────────────────────────────────────
 
@@ -70,6 +71,17 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
       backgroundColor: kBackground,
       appBar: AppBar(
         title: const Text('Events'),
+        actions: [
+          IconButton(
+            tooltip: 'New event',
+            icon: const Icon(Icons.add),
+            onPressed: () async {
+              final saved = await Navigator.push<bool>(context,
+                  MaterialPageRoute(builder: (_) => const EventFormScreen()));
+              if (saved == true) _load();
+            },
+          ),
+        ],
         bottom: TabBar(
           controller: _tabs,
           labelColor: kPrimary,
@@ -286,6 +298,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with SingleTicker
           if (e != null) PopupMenuButton<String>(
             onSelected: (action) => _handleAction(action),
             itemBuilder: (_) => [
+              const PopupMenuItem(value: 'edit', child: Text('Edit Event')),
               if (!isCancelled) const PopupMenuItem(value: 'cancel', child: Text('Cancel Event')),
               PopupMenuItem(value: 'soldout', child: Text(isSoldOut ? 'Remove Sold Out' : 'Mark Sold Out')),
               PopupMenuItem(value: 'publish', child: Text(isPublished ? 'Unpublish' : 'Publish')),
@@ -320,6 +333,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> with SingleTicker
   }
 
   Future<void> _handleAction(String action) async {
+    if (action == 'edit') {
+      final saved = await Navigator.push<bool>(context, MaterialPageRoute(
+          builder: (_) => EventFormScreen(event: _event)));
+      if (saved == true) _load();
+      return;
+    }
     final api = context.read<AppProvider>().api;
     try {
       switch (action) {
