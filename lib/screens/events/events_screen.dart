@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../models/app_provider.dart';
 import '../../theme/app_theme.dart';
+import 'scan_checkin_screen.dart';
 
 // ── Events List ───────────────────────────────────────────────────────────────
 
@@ -271,6 +272,17 @@ class _EventDetailScreenState extends State<EventDetailScreen> with SingleTicker
       appBar: AppBar(
         title: Text(widget.title, style: const TextStyle(fontSize: 16)),
         actions: [
+          IconButton(
+            tooltip: 'Scan tickets',
+            icon: const Icon(Icons.qr_code_scanner),
+            onPressed: () async {
+              await Navigator.push(context, MaterialPageRoute(
+                builder: (_) => ScanCheckinScreen(eventName: widget.title),
+              ));
+              // Refresh so the attendee list + counts reflect any scans.
+              _load();
+            },
+          ),
           if (e != null) PopupMenuButton<String>(
             onSelected: (action) => _handleAction(action),
             itemBuilder: (_) => [

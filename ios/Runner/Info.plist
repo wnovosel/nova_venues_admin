@@ -30,6 +30,10 @@
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Sign in to Nova Venues Admin with Face ID</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Scan event tickets to check guests in at the door</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Attach photos to venue and event records</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

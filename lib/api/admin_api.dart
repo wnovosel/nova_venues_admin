@@ -294,6 +294,12 @@ class AdminApiClient {
   Future<Map<String, dynamic>> checkIn(int eventId, dynamic ticketId) =>
       _post('/api/v1/admin/events/$eventId/checkin/$ticketId', {});
 
+  /// Check in a ticket by its scanned QR token. Backend accepts a bare UUID or
+  /// a full ticket URL and returns {checked_in, already_checked_in, name,
+  /// event_name, quantity}. Verified against mobile_api.py::admin_scan_checkin.
+  Future<Map<String, dynamic>> scanCheckin(String token) =>
+      _post('/api/v1/admin/events/scan-checkin', {'token': token});
+
   Future<Map<String, dynamic>> undoCheckin(int eventId, dynamic ticketId) =>
       _post('/api/v1/admin/events/$eventId/attendees/$ticketId/undo-checkin', {});
 
