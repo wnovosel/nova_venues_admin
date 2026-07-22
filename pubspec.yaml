@@ -18,6 +18,7 @@ dependencies:
   cached_network_image: ^3.4.1
   image_picker: ^1.1.2
   local_auth: ^2.3.0
+  audioplayers: ^6.5.1  # voicemail playback (no mic dependency)
   mobile_scanner: ^7.0.0  # QR ticket scanning for event door check-in
   flutter_widget_from_html_core: ^0.17.2  # HTML render (no audio/video/webview → no mic requirement)
   fwfh_cached_network_image: ^0.16.1      # inline <img> via cached_network_image (already a dep)

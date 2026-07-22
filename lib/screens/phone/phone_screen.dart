@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../models/app_provider.dart';
 import '../../theme/app_theme.dart';
+import 'voicemail_sheet.dart';
 
 class PhoneScreen extends StatefulWidget {
   const PhoneScreen({super.key});
@@ -118,19 +119,30 @@ class _PhoneScreenState extends State<PhoneScreen> {
         const Text('RECENT CALLS', style: TextStyle(fontSize: 12,
             fontWeight: FontWeight.w800, color: kTextMuted, letterSpacing: 1)),
         const SizedBox(height: 6),
-        for (final c in calls) ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(
-              (c['voicemail_url'] ?? '').toString().isNotEmpty
-                  ? Icons.voicemail : Icons.phone,
-              color: (c['voicemail_url'] ?? '').toString().isNotEmpty ? kError : kSuccess),
-          title: Text((c['caller_name'] ?? c['from_number'] ?? 'Unknown').toString(),
-              style: const TextStyle(fontWeight: FontWeight.w600, color: kTextDark)),
-          subtitle: Text((c['summary'] ?? c['voicemail_transcript'] ?? '').toString(),
-              maxLines: 2, overflow: TextOverflow.ellipsis),
-          trailing: Text(_fmt(c['started_at']),
-              style: const TextStyle(fontSize: 11, color: kTextMuted)),
-        ),
+        for (final c in calls) Builder(builder: (ctx) {
+          final hasVm = (c['voicemail_url'] ?? c['recording_url'] ?? '')
+              .toString().isNotEmpty;
+          return ListTile(
+            contentPadding: EdgeInsets.zero,
+            // Voicemails open a sheet to listen + read the full transcript.
+            onTap: hasVm ? () => showVoicemailSheet(ctx, c) : null,
+            leading: Icon(hasVm ? Icons.voicemail : Icons.phone,
+                color: hasVm ? kError : kSuccess),
+            title: Text((c['caller_name'] ?? c['from_number'] ?? 'Unknown').toString(),
+                style: const TextStyle(fontWeight: FontWeight.w600, color: kTextDark)),
+            subtitle: Text((c['summary'] ?? c['voicemail_transcript'] ?? '').toString(),
+                maxLines: 2, overflow: TextOverflow.ellipsis),
+            trailing: hasVm
+                ? Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(_fmt(c['started_at']),
+                        style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.play_circle_outline, size: 20, color: kPrimary),
+                  ])
+                : Text(_fmt(c['started_at']),
+                    style: const TextStyle(fontSize: 11, color: kTextMuted)),
+          );
+        }),
         if (calls.isEmpty)
           const Text('No calls yet', style: TextStyle(color: kTextMuted)),
       ],
