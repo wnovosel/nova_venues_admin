@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../events/events_screen.dart';
 import '../hiring/hiring_screen.dart';
 import '../inbox/inbox_screen.dart';
+import '../marketing/marketing_screen.dart';
 import '../rentals/rentals_screen.dart';
 import '../vendors/vendors_screen.dart';
 
@@ -79,11 +80,18 @@ class _MorningScreenState extends State<MorningScreen> {
           .map((item) => item.cast<String, dynamic>())
           .toList();
 
+  List<Map<String, dynamic>> get _marketingPending =>
+      (_brief['marketing_pending'] as List? ?? const [])
+          .whereType<Map>()
+          .map((e) => e.cast<String, dynamic>())
+          .toList();
+
   int get _attentionCount =>
       _list('new_hires').length +
       _list('new_vendors').length +
       _list('voicemails').length +
       _list('new_rentals').length +
+      _marketingPending.length +
       (_brief['system_alerts'] as List? ?? const []).length;
 
   double _number(dynamic value) =>
@@ -104,10 +112,13 @@ class _MorningScreenState extends State<MorningScreen> {
                 : null),
       );
 
+  // Backend (mobile_api.py::admin_brief) returns ticket_seats_today (sum of
+  // quantity = people coming) and tickets_today (ticket records). The previous
+  // key names existed in no payload, so this tile always read 0.
   int get _ticketsToday => _integer(
-        _brief['tickets_sold_today'] ??
-            _brief['ticket_quantity_today'] ??
-            _dashboard['tickets_sold_today'],
+        _brief['ticket_seats_today'] ??
+            _brief['tickets_today'] ??
+            _dashboard['ticket_seats_today'],
       );
 
   int get _eventsNextSevenDays {
@@ -294,10 +305,12 @@ class _MorningScreenState extends State<MorningScreen> {
                         vendors: _list('new_vendors'),
                         voicemails: _list('voicemails'),
                         hires: _list('new_hires'),
+                        marketing: _marketingPending,
                         onRentals: () => _open(const RentalsScreen()),
                         onVendors: () => _open(const VendorsScreen()),
                         onVoicemails: () => _open(const InboxScreen()),
                         onHires: () => _open(const HiringScreen()),
+                        onMarketing: () => _open(const MarketingScreen()),
                       ),
                     const SizedBox(height: 28),
                     const _SectionHeader(
@@ -642,6 +655,7 @@ class _AttentionBoard extends StatelessWidget {
     required this.vendors,
     required this.voicemails,
     required this.hires,
+    required this.marketing,
     required this.onRentals,
     required this.onVendors,
     required this.onVoicemails,
@@ -651,10 +665,12 @@ class _AttentionBoard extends StatelessWidget {
   final List<Map<String, dynamic>> vendors;
   final List<Map<String, dynamic>> voicemails;
   final List<Map<String, dynamic>> hires;
+  final List<Map<String, dynamic>> marketing;
   final VoidCallback onRentals;
   final VoidCallback onVendors;
   final VoidCallback onVoicemails;
   final VoidCallback onHires;
+  final VoidCallback onMarketing;
 
   @override
   Widget build(BuildContext context) {
@@ -667,6 +683,8 @@ class _AttentionBoard extends StatelessWidget {
           Icons.voicemail_rounded, onVoicemails),
       _AttentionData('Hire applications', hires.length,
           Icons.person_add_alt_1_rounded, onHires),
+      _AttentionData('Marketing approvals', marketing.length,
+          Icons.campaign_outlined, onMarketing),
     ].where((row) => row.count > 0).toList();
     return Card(
       margin: EdgeInsets.zero,
