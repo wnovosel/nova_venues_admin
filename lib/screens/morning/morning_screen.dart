@@ -81,7 +81,8 @@ class _MorningScreenState extends State<MorningScreen> {
       _list('new_vendors').length +
       _list('voicemails').length +
       _list('new_rentals').length +
-      (_brief['system_alerts'] as List? ?? const []).length;
+      (_brief['system_alerts'] as List? ?? const []).length +
+      (_brief['marketing_pending'] as List? ?? const []).length;
 
   double get _revenue {
     final value = _brief['total_revenue_today'] ??
@@ -97,6 +98,24 @@ class _MorningScreenState extends State<MorningScreen> {
         0;
     return value is num ? value.toInt() : int.tryParse('$value') ?? 0;
   }
+
+  int get _tickets {
+    final value = _brief['ticket_seats_today'] ?? _brief['tickets_today'] ?? 0;
+    return value is num ? value.toInt() : int.tryParse('$value') ?? 0;
+  }
+
+  List<Map<String, dynamic>> _marketingPending() =>
+      (_brief['marketing_pending'] as List? ?? const [])
+          .whereType<Map>()
+          .map((e) => e.cast<String, dynamic>())
+          // _ActionSection reads name/message for its title/subtitle, so map the
+          // post onto those keys: platform as the heading, the copy as preview.
+          .map((p) => {
+                ...p,
+                'name': (p['platform'] ?? 'Post').toString().toUpperCase(),
+                'message': (p['copy'] ?? '').toString(),
+              })
+          .toList();
 
   @override
   Widget build(BuildContext context) {
@@ -171,6 +190,7 @@ class _MorningScreenState extends State<MorningScreen> {
                             ))),
                     _PulseMetrics(
                       revenue: _revenue,
+                      tickets: _tickets,
                       orders: _orders,
                       events: _events.length,
                       attention: _attentionCount,
@@ -218,6 +238,14 @@ class _MorningScreenState extends State<MorningScreen> {
                         items: _list('new_hires'),
                         onAction: _hireAction,
                       ),
+                      const SizedBox(height: 10),
+                      _ActionSection(
+                        title: 'Marketing approvals',
+                        icon: Icons.campaign_outlined,
+                        color: kWarning,
+                        items: _marketingPending(),
+                        onAction: _marketingAction,
+                      ),
                     ],
                     const SizedBox(height: 22),
                     const _SectionHeading(
@@ -254,6 +282,19 @@ class _MorningScreenState extends State<MorningScreen> {
   Future<void> _voicemailAction(Map<String, dynamic> item, bool approve) async {
     await context.read<AppProvider>().api.markVoicemailHandled(item['id'] ?? item['call_sid']);
     await _load();
+  }
+
+  Future<void> _marketingAction(Map<String, dynamic> item, bool approve) async {
+    // Approve feeds marketing_publisher (status='approved'). There is no
+    // mobile reject endpoint yet, so decline routes to the Marketing screen.
+    if (approve) {
+      await context.read<AppProvider>().api.approvePost(item['id']);
+      await _load();
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Open Marketing to edit or remove this post.')));
+    }
   }
 
   Future<void> _hireAction(Map<String, dynamic> item, bool approve) async {
@@ -318,9 +359,10 @@ class _PulseHero extends StatelessWidget {
 }
 
 class _PulseMetrics extends StatelessWidget {
-  const _PulseMetrics({required this.revenue, required this.orders, required this.events, required this.attention});
+  const _PulseMetrics({required this.revenue, required this.orders, required this.tickets, required this.events, required this.attention});
   final double revenue;
   final int orders;
+  final int tickets;
   final int events;
   final int attention;
 
@@ -329,6 +371,7 @@ class _PulseMetrics extends StatelessWidget {
     final metrics = [
       ('Revenue', '\$${NumberFormat('#,##0').format(revenue)}', Icons.payments_outlined),
       ('Orders', '$orders', Icons.receipt_long_outlined),
+      ('Tickets sold', '$tickets', Icons.confirmation_number_outlined),
       ('Upcoming', '$events', Icons.event_outlined),
       ('Open items', '$attention', Icons.pending_actions_rounded),
     ];
