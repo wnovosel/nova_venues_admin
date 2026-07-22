@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/app_provider.dart';
 import '../../theme/app_theme.dart';
+import '../events/events_screen.dart';
+import '../hiring/hiring_screen.dart';
+import '../inbox/inbox_screen.dart';
+import '../rentals/rentals_screen.dart';
+import '../vendors/vendors_screen.dart';
 
 class MorningScreen extends StatefulWidget {
   const MorningScreen({super.key});
@@ -30,7 +36,6 @@ class _MorningScreenState extends State<MorningScreen> {
       _loading = true;
       _error = null;
     });
-
     try {
       final api = context.read<AppProvider>().api;
       final results = await Future.wait([
@@ -38,16 +43,12 @@ class _MorningScreenState extends State<MorningScreen> {
         api.getDashboard().catchError((_) => <String, dynamic>{}),
         api.getEvents().catchError((_) => <String, dynamic>{}),
       ]);
-
-      final eventsResponse = results[2];
-      final rawEvents = (eventsResponse['events'] as List? ?? const []);
       final now = DateTime.now();
-      final upcoming = rawEvents
+      final upcoming = (results[2]['events'] as List? ?? const [])
           .whereType<Map>()
           .map((event) => event.cast<String, dynamic>())
           .where((event) {
-            final value = event['starts_at'];
-            final date = value is String ? DateTime.tryParse(value)?.toLocal() : null;
+            final date = DateTime.tryParse('${event['starts_at']}')?.toLocal();
             return date != null && !date.isBefore(now);
           })
           .toList()
@@ -56,7 +57,6 @@ class _MorningScreenState extends State<MorningScreen> {
           final bd = DateTime.tryParse('${b['starts_at']}') ?? DateTime(2100);
           return ad.compareTo(bd);
         });
-
       if (!mounted) return;
       setState(() {
         _brief = results[0];
@@ -74,53 +74,142 @@ class _MorningScreenState extends State<MorningScreen> {
   }
 
   List<Map<String, dynamic>> _list(String key) =>
-      (_dashboard[key] as List? ?? const []).whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
+      (_dashboard[key] as List? ?? const [])
+          .whereType<Map>()
+          .map((item) => item.cast<String, dynamic>())
+          .toList();
 
   int get _attentionCount =>
       _list('new_hires').length +
       _list('new_vendors').length +
       _list('voicemails').length +
       _list('new_rentals').length +
-      (_brief['system_alerts'] as List? ?? const []).length +
-      (_brief['marketing_pending'] as List? ?? const []).length;
+      (_brief['system_alerts'] as List? ?? const []).length;
 
-  double get _revenue {
-    final value = _brief['total_revenue_today'] ??
-        _brief['revenue_today'] ??
-        (_brief['sales'] is Map ? (_brief['sales'] as Map)['gross'] : null) ??
-        0;
-    return value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
+  double _number(dynamic value) =>
+      value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
+  int _integer(dynamic value) =>
+      value is num ? value.toInt() : int.tryParse('$value') ?? 0;
+
+  double get _revenue => _number(
+        _brief['total_revenue_today'] ??
+            _brief['revenue_today'] ??
+            (_brief['sales'] is Map ? (_brief['sales'] as Map)['gross'] : null),
+      );
+
+  int get _orders => _integer(
+        _brief['orders_today'] ??
+            (_brief['sales'] is Map
+                ? (_brief['sales'] as Map)['order_count']
+                : null),
+      );
+
+  int get _ticketsToday => _integer(
+        _brief['tickets_sold_today'] ??
+            _brief['ticket_quantity_today'] ??
+            _dashboard['tickets_sold_today'],
+      );
+
+  int get _eventsNextSevenDays {
+    final cutoff = DateTime.now().add(const Duration(days: 7));
+    return _events.where((event) {
+      final date = DateTime.tryParse('${event['starts_at']}')?.toLocal();
+      return date != null && date.isBefore(cutoff);
+    }).length;
   }
 
-  int get _orders {
-    final value = _brief['orders_today'] ??
-        (_brief['sales'] is Map ? (_brief['sales'] as Map)['order_count'] : null) ??
-        0;
-    return value is num ? value.toInt() : int.tryParse('$value') ?? 0;
+  void _open(Widget screen) {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen));
   }
 
-  int get _tickets {
-    final value = _brief['ticket_seats_today'] ?? _brief['tickets_today'] ?? 0;
-    return value is num ? value.toInt() : int.tryParse('$value') ?? 0;
+  void _showQuickActions() {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Where do you want to go?',
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Text('Jump straight into the work that matters.',
+                style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 18),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _QuickAction(
+                    label: 'Events',
+                    icon: Icons.confirmation_num_outlined,
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _open(const EventsScreen());
+                    }),
+                _QuickAction(
+                    label: 'Rentals',
+                    icon: Icons.home_work_outlined,
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _open(const RentalsScreen());
+                    }),
+                _QuickAction(
+                    label: 'Vendors',
+                    icon: Icons.storefront_outlined,
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _open(const VendorsScreen());
+                    }),
+                _QuickAction(
+                    label: 'Hiring',
+                    icon: Icons.person_add_alt_1_rounded,
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _open(const HiringScreen());
+                    }),
+                _QuickAction(
+                    label: 'Inbox',
+                    icon: Icons.inbox_outlined,
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _open(const InboxScreen());
+                    }),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  List<Map<String, dynamic>> _marketingPending() =>
-      (_brief['marketing_pending'] as List? ?? const [])
-          .whereType<Map>()
-          .map((e) => e.cast<String, dynamic>())
-          // _ActionSection reads name/message for its title/subtitle, so map the
-          // post onto those keys: platform as the heading, the copy as preview.
-          .map((p) => {
-                ...p,
-                'name': (p['platform'] ?? 'Post').toString().toUpperCase(),
-                'message': (p['copy'] ?? '').toString(),
-              })
-          .toList();
+  void _showDataNotice(String title, String message) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.fromLTRB(22, 4, 22, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(message),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final now = DateTime.now();
     final greeting = now.hour < 12
         ? 'Good morning'
@@ -129,132 +218,100 @@ class _MorningScreenState extends State<MorningScreen> {
             : 'Good evening';
 
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showQuickActions,
+        icon: const Icon(Icons.auto_awesome_rounded),
+        label: const Text('Nova'),
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverAppBar(
               pinned: true,
               title: Text('Today', style: theme.textTheme.titleLarge),
               actions: [
                 IconButton(
-                  tooltip: 'Refresh pulse',
+                  tooltip: 'Refresh company pulse',
                   onPressed: _load,
                   icon: const Icon(Icons.refresh_rounded),
                 ),
+                const SizedBox(width: 6),
               ],
             ),
             if (_loading)
-              const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+              const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator()))
             else if (_error != null)
               SliverFillRemaining(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.cloud_off_rounded, size: 44, color: scheme.error),
-                        const SizedBox(height: 12),
-                        Text('Could not load the company pulse', style: theme.textTheme.titleMedium),
-                        const SizedBox(height: 6),
-                        Text(_error!, textAlign: TextAlign.center),
-                        const SizedBox(height: 18),
-                        FilledButton.icon(
-                          onPressed: _load,
-                          icon: const Icon(Icons.refresh_rounded),
-                          label: const Text('Try again'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              )
+                  child: _ErrorState(message: _error!, onRetry: _load))
             else
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 132),
                 sliver: SliverList.list(
                   children: [
-                    _PulseHero(
+                    _CommandHero(
                       greeting: greeting,
                       date: DateFormat('EEEE, MMMM d').format(now),
                       tenantName: context.read<AppProvider>().tenantName,
                       attentionCount: _attentionCount,
+                      nextEvent: _events.isEmpty ? null : _events.first,
                     ),
-                    const SizedBox(height: 16),
-                    ...((_brief['system_alerts'] as List? ?? const [])
-                        .whereType<Map>()
-                        .map((alert) => Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: _SystemAlert(alert: alert.cast<String, dynamic>()),
-                            ))),
-                    _PulseMetrics(
+                    const SizedBox(height: 12),
+                    _MetricGrid(
                       revenue: _revenue,
-                      tickets: _tickets,
                       orders: _orders,
-                      events: _events.length,
+                      ticketsToday: _ticketsToday,
+                      eventsNextSevenDays: _eventsNextSevenDays,
                       attention: _attentionCount,
+                      onRevenue: () => _showDataNotice('Sales Today',
+                          'This will open the live sales workspace when the shared web reporting route is connected.'),
+                      onOrders: () => _showDataNotice('Orders Today',
+                          'This will open today’s transaction list from the same reporting source as the website.'),
+                      onTickets: () => _open(const EventsScreen()),
+                      onEvents: () => _open(const EventsScreen()),
+                      onAttention: () => ScaffoldMessenger.of(context)
+                          .showSnackBar(const SnackBar(
+                              content: Text('Your open items are listed below.'))),
                     ),
-                    const SizedBox(height: 22),
-                    _SectionHeading(
+                    ..._alerts(),
+                    const SizedBox(height: 26),
+                    _SectionHeader(
+                      eyebrow: 'Action center',
                       title: 'Needs your attention',
                       subtitle: _attentionCount == 0
-                          ? 'Nothing urgent is waiting on you.'
-                          : '$_attentionCount outstanding items across the company.',
+                          ? 'You are caught up. Nothing urgent is waiting.'
+                          : '$_attentionCount items are waiting across the business.',
                       icon: Icons.bolt_rounded,
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     if (_attentionCount == 0)
                       const _AllClearCard()
-                    else ...[
-                      _ActionSection(
-                        title: 'Rental requests',
-                        icon: Icons.home_work_outlined,
-                        color: const Color(0xFF6B4FBB),
-                        items: _list('new_rentals'),
-                        onAction: _rentalAction,
+                    else
+                      _AttentionBoard(
+                        rentals: _list('new_rentals'),
+                        vendors: _list('new_vendors'),
+                        voicemails: _list('voicemails'),
+                        hires: _list('new_hires'),
+                        onRentals: () => _open(const RentalsScreen()),
+                        onVendors: () => _open(const VendorsScreen()),
+                        onVoicemails: () => _open(const InboxScreen()),
+                        onHires: () => _open(const HiringScreen()),
                       ),
-                      const SizedBox(height: 10),
-                      _ActionSection(
-                        title: 'Vendor requests',
-                        icon: Icons.storefront_outlined,
-                        color: kWarning,
-                        items: _list('new_vendors'),
-                        onAction: _vendorAction,
-                      ),
-                      const SizedBox(height: 10),
-                      _ActionSection(
-                        title: 'New voicemails',
-                        icon: Icons.voicemail_rounded,
-                        color: scheme.primary,
-                        items: _list('voicemails'),
-                        onAction: _voicemailAction,
-                      ),
-                      const SizedBox(height: 10),
-                      _ActionSection(
-                        title: 'Hire applications',
-                        icon: Icons.person_add_alt_1_rounded,
-                        color: kSuccess,
-                        items: _list('new_hires'),
-                        onAction: _hireAction,
-                      ),
-                      const SizedBox(height: 10),
-                      _ActionSection(
-                        title: 'Marketing approvals',
-                        icon: Icons.campaign_outlined,
-                        color: kWarning,
-                        items: _marketingPending(),
-                        onAction: _marketingAction,
-                      ),
-                    ],
-                    const SizedBox(height: 22),
-                    const _SectionHeading(
+                    const SizedBox(height: 28),
+                    const _SectionHeader(
+                      eyebrow: 'Next seven days',
                       title: 'Coming up',
-                      subtitle: 'The next events on the company calendar.',
+                      subtitle:
+                          'Events that can affect staffing, inventory, and guest flow.',
                       icon: Icons.calendar_month_rounded,
                     ),
-                    const SizedBox(height: 10),
-                    _UpcomingEvents(events: _events.take(6).toList()),
+                    const SizedBox(height: 12),
+                    _UpcomingEvents(
+                      events: _events.take(6).toList(),
+                      onOpenAll: () => _open(const EventsScreen()),
+                    ),
                   ],
                 ),
               ),
@@ -264,92 +321,143 @@ class _MorningScreenState extends State<MorningScreen> {
     );
   }
 
-  Future<void> _rentalAction(Map<String, dynamic> item, bool approve) async {
-    final id = '${item['id']}';
-    if (approve) {
-      await context.read<AppProvider>().api.confirmRental(id);
-    } else {
-      await context.read<AppProvider>().api.declineRental(id);
-    }
-    await _load();
-  }
-
-  Future<void> _vendorAction(Map<String, dynamic> item, bool approve) async {
-    await context.read<AppProvider>().api.updateVendorStatus(item['id'], approve ? 'approved' : 'rejected');
-    await _load();
-  }
-
-  Future<void> _voicemailAction(Map<String, dynamic> item, bool approve) async {
-    await context.read<AppProvider>().api.markVoicemailHandled(item['id'] ?? item['call_sid']);
-    await _load();
-  }
-
-  Future<void> _marketingAction(Map<String, dynamic> item, bool approve) async {
-    // Approve feeds marketing_publisher (status='approved'). There is no
-    // mobile reject endpoint yet, so decline routes to the Marketing screen.
-    if (approve) {
-      await context.read<AppProvider>().api.approvePost(item['id']);
-      await _load();
-    } else {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Open Marketing to edit or remove this post.')));
-    }
-  }
-
-  Future<void> _hireAction(Map<String, dynamic> item, bool approve) async {
-    await context.read<AppProvider>().api.updateHireStatus(item['id'], approve ? 'approved' : 'rejected');
-    await _load();
+  List<Widget> _alerts() {
+    final alerts = (_brief['system_alerts'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => item.cast<String, dynamic>())
+        .toList();
+    if (alerts.isEmpty) return const [];
+    return [
+      const SizedBox(height: 12),
+      ...alerts.map((alert) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _AlertCard(alert: alert),
+          )),
+    ];
   }
 }
 
-class _PulseHero extends StatelessWidget {
-  const _PulseHero({required this.greeting, required this.date, required this.tenantName, required this.attentionCount});
+class _CommandHero extends StatelessWidget {
+  const _CommandHero({
+    required this.greeting,
+    required this.date,
+    required this.tenantName,
+    required this.attentionCount,
+    required this.nextEvent,
+  });
   final String greeting;
   final String date;
   final String tenantName;
   final int attentionCount;
+  final Map<String, dynamic>? nextEvent;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final clear = attentionCount == 0;
+    final nextDate = nextEvent == null
+        ? null
+        : DateTime.tryParse('${nextEvent!['starts_at']}')?.toLocal();
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
         gradient: LinearGradient(
-          colors: [scheme.primary, Color.lerp(scheme.primary, scheme.secondary, .74)!],
+          colors: [
+            scheme.primary,
+            Color.lerp(scheme.primary, scheme.secondary, .72)!,
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        boxShadow: [BoxShadow(color: scheme.primary.withValues(alpha: .24), blurRadius: 28, offset: const Offset(0, 14))],
+        boxShadow: [
+          BoxShadow(
+            color: scheme.primary.withValues(alpha: .26),
+            blurRadius: 32,
+            offset: const Offset(0, 16),
+          )
+        ],
       ),
       child: Stack(
         children: [
-          Positioned(right: -20, top: -28, child: Icon(Icons.monitor_heart_rounded, size: 132, color: scheme.onPrimary.withValues(alpha: .09))),
+          Positioned(
+            right: -24,
+            top: -28,
+            child: Icon(Icons.monitor_heart_rounded,
+                size: 142, color: scheme.onPrimary.withValues(alpha: .09)),
+          ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(greeting.toUpperCase(), style: theme.textTheme.labelMedium?.copyWith(color: scheme.onPrimary.withValues(alpha: .72), letterSpacing: 1.2, fontWeight: FontWeight.w800)),
+              Text(greeting.toUpperCase(),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: scheme.onPrimary.withValues(alpha: .72),
+                    letterSpacing: 1.3,
+                    fontWeight: FontWeight.w800,
+                  )),
               const SizedBox(height: 7),
-              Text('The pulse of $tenantName', style: theme.textTheme.headlineSmall?.copyWith(color: scheme.onPrimary, fontWeight: FontWeight.w900)),
+              Text('The pulse of $tenantName',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                      color: scheme.onPrimary, fontWeight: FontWeight.w900)),
               const SizedBox(height: 5),
-              Text(date, style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onPrimary.withValues(alpha: .78))),
+              Text(date,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onPrimary.withValues(alpha: .78))),
               const SizedBox(height: 22),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                decoration: BoxDecoration(color: scheme.onPrimary.withValues(alpha: .12), borderRadius: BorderRadius.circular(16)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                decoration: BoxDecoration(
+                  color: scheme.onPrimary.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(clear ? Icons.check_circle : Icons.bolt_rounded, size: 18, color: scheme.onPrimary),
+                    Icon(
+                      attentionCount == 0
+                          ? Icons.check_circle_rounded
+                          : Icons.bolt_rounded,
+                      size: 18,
+                      color: scheme.onPrimary,
+                    ),
                     const SizedBox(width: 8),
-                    Text(clear ? 'Everything is running smoothly' : '$attentionCount items need attention', style: theme.textTheme.labelLarge?.copyWith(color: scheme.onPrimary, fontWeight: FontWeight.w800)),
+                    Text(
+                      attentionCount == 0
+                          ? 'Everything is running smoothly'
+                          : '$attentionCount items need attention',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                          color: scheme.onPrimary,
+                          fontWeight: FontWeight.w800),
+                    ),
                   ],
                 ),
               ),
+              if (nextEvent != null && nextDate != null) ...[
+                const SizedBox(height: 18),
+                Divider(color: scheme.onPrimary.withValues(alpha: .18)),
+                const SizedBox(height: 8),
+                Text('NEXT ON THE CALENDAR',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                        color: scheme.onPrimary.withValues(alpha: .66),
+                        letterSpacing: 1.1)),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('${nextEvent!['title'] ?? 'Upcoming event'}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                              color: scheme.onPrimary,
+                              fontWeight: FontWeight.w800)),
+                    ),
+                    Text(DateFormat('EEE, MMM d').format(nextDate),
+                        style: theme.textTheme.labelLarge
+                            ?.copyWith(color: scheme.onPrimary)),
+                  ],
+                ),
+              ],
             ],
           ),
         ],
@@ -358,176 +466,454 @@ class _PulseHero extends StatelessWidget {
   }
 }
 
-class _PulseMetrics extends StatelessWidget {
-  const _PulseMetrics({required this.revenue, required this.orders, required this.tickets, required this.events, required this.attention});
+class _MetricGrid extends StatelessWidget {
+  const _MetricGrid({
+    required this.revenue,
+    required this.orders,
+    required this.ticketsToday,
+    required this.eventsNextSevenDays,
+    required this.attention,
+    required this.onRevenue,
+    required this.onOrders,
+    required this.onTickets,
+    required this.onEvents,
+    required this.onAttention,
+  });
   final double revenue;
   final int orders;
-  final int tickets;
-  final int events;
+  final int ticketsToday;
+  final int eventsNextSevenDays;
   final int attention;
+  final VoidCallback onRevenue;
+  final VoidCallback onOrders;
+  final VoidCallback onTickets;
+  final VoidCallback onEvents;
+  final VoidCallback onAttention;
 
   @override
   Widget build(BuildContext context) {
-    final metrics = [
-      ('Revenue', '\$${NumberFormat('#,##0').format(revenue)}', Icons.payments_outlined),
-      ('Orders', '$orders', Icons.receipt_long_outlined),
-      ('Tickets sold', '$tickets', Icons.confirmation_number_outlined),
-      ('Upcoming', '$events', Icons.event_outlined),
-      ('Open items', '$attention', Icons.pending_actions_rounded),
+    final items = [
+      _MetricData('Sales today', '\$${NumberFormat('#,##0').format(revenue)}',
+          'Revenue since midnight', Icons.payments_outlined, onRevenue),
+      _MetricData('Orders today', '$orders', 'Completed transactions',
+          Icons.receipt_long_outlined, onOrders),
+      _MetricData('Tickets today', '$ticketsToday', 'Sold since midnight',
+          Icons.local_activity_outlined, onTickets),
+      _MetricData('Next 7 days', '$eventsNextSevenDays', 'Scheduled events',
+          Icons.event_available_outlined, onEvents),
+      _MetricData('Open items', '$attention', 'Waiting for action',
+          Icons.pending_actions_rounded, onAttention),
     ];
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: metrics.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1.65),
-      itemBuilder: (context, index) {
-        final metric = metrics[index];
-        return Card(
-          margin: EdgeInsets.zero,
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Icon(metric.$3, size: 20, color: Theme.of(context).colorScheme.primary),
-                Text(metric.$2, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
-                Text(metric.$1, style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ),
-          ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final half = (constraints.maxWidth - 10) / 2;
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: items
+              .map((item) => SizedBox(
+                    width: identical(item, items.last)
+                        ? constraints.maxWidth
+                        : half,
+                    child: _MetricCard(data: item),
+                  ))
+              .toList(),
         );
       },
     );
   }
 }
 
-class _SectionHeading extends StatelessWidget {
-  const _SectionHeading({required this.title, required this.subtitle, required this.icon});
+class _MetricData {
+  const _MetricData(
+      this.label, this.value, this.detail, this.icon, this.onTap);
+  final String label;
+  final String value;
+  final String detail;
+  final IconData icon;
+  final VoidCallback onTap;
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({required this.data});
+  final _MetricData data;
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: data.onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(15),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: scheme.primary.withValues(alpha: .11),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(data.icon, size: 19, color: scheme.primary),
+                ),
+                const Spacer(),
+                Icon(Icons.arrow_outward_rounded,
+                    size: 17, color: scheme.onSurfaceVariant),
+              ]),
+              const SizedBox(height: 14),
+              Text(data.value,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  )),
+              const SizedBox(height: 2),
+              Text(data.label,
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 3),
+              Text(data.detail,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.eyebrow,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
+  final String eyebrow;
   final String title;
   final String subtitle;
   final IconData icon;
-
   @override
   Widget build(BuildContext context) => Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(width: 42, height: 42, decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary.withValues(alpha: .12), borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: Theme.of(context).colorScheme.primary)),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Theme.of(context)
+                  .colorScheme
+                  .primary
+                  .withValues(alpha: .11),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+          ),
           const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: Theme.of(context).textTheme.titleLarge), const SizedBox(height: 2), Text(subtitle, style: Theme.of(context).textTheme.bodySmall)])),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(eyebrow.toUpperCase(),
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        letterSpacing: 1,
+                        fontWeight: FontWeight.w800)),
+                const SizedBox(height: 2),
+                Text(title, style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 3),
+                Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
         ],
       );
 }
 
-class _SystemAlert extends StatelessWidget {
-  const _SystemAlert({required this.alert});
-  final Map<String, dynamic> alert;
+class _AttentionBoard extends StatelessWidget {
+  const _AttentionBoard({
+    required this.rentals,
+    required this.vendors,
+    required this.voicemails,
+    required this.hires,
+    required this.onRentals,
+    required this.onVendors,
+    required this.onVoicemails,
+    required this.onHires,
+  });
+  final List<Map<String, dynamic>> rentals;
+  final List<Map<String, dynamic>> vendors;
+  final List<Map<String, dynamic>> voicemails;
+  final List<Map<String, dynamic>> hires;
+  final VoidCallback onRentals;
+  final VoidCallback onVendors;
+  final VoidCallback onVoicemails;
+  final VoidCallback onHires;
 
+  @override
+  Widget build(BuildContext context) {
+    final rows = [
+      _AttentionData('Rental requests', rentals.length,
+          Icons.home_work_outlined, onRentals),
+      _AttentionData('Vendor applications', vendors.length,
+          Icons.storefront_outlined, onVendors),
+      _AttentionData('New voicemails', voicemails.length,
+          Icons.voicemail_rounded, onVoicemails),
+      _AttentionData('Hire applications', hires.length,
+          Icons.person_add_alt_1_rounded, onHires),
+    ].where((row) => row.count > 0).toList();
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (var index = 0; index < rows.length; index++) ...[
+            ListTile(
+              minTileHeight: 66,
+              leading: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(rows[index].icon,
+                    color: Theme.of(context).colorScheme.primary),
+              ),
+              title: Text(rows[index].label,
+                  style: const TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: Text('${rows[index].count} waiting for review'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Badge(label: Text('${rows[index].count}')),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.chevron_right_rounded),
+                ],
+              ),
+              onTap: rows[index].onTap,
+            ),
+            if (index != rows.length - 1)
+              const Divider(height: 1, indent: 72),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AttentionData {
+  const _AttentionData(this.label, this.count, this.icon, this.onTap);
+  final String label;
+  final int count;
+  final IconData icon;
+  final VoidCallback onTap;
+}
+
+class _UpcomingEvents extends StatelessWidget {
+  const _UpcomingEvents({required this.events, required this.onOpenAll});
+  final List<Map<String, dynamic>> events;
+  final VoidCallback onOpenAll;
+  @override
+  Widget build(BuildContext context) {
+    if (events.isEmpty) {
+      return Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(children: [
+            const Icon(Icons.event_available_outlined, size: 34),
+            const SizedBox(height: 10),
+            Text('No events in the next seven days',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text('Your full event calendar is available in Operate.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall),
+          ]),
+        ),
+      );
+    }
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: [
+        for (var index = 0; index < events.length; index++) ...[
+          _EventRow(event: events[index], onTap: onOpenAll),
+          if (index != events.length - 1)
+            const Divider(height: 1, indent: 74),
+        ],
+        const Divider(height: 1),
+        ListTile(
+          title: const Text('View all events',
+              style: TextStyle(fontWeight: FontWeight.w800)),
+          trailing: const Icon(Icons.arrow_forward_rounded),
+          onTap: onOpenAll,
+        ),
+      ]),
+    );
+  }
+}
+
+class _EventRow extends StatelessWidget {
+  const _EventRow({required this.event, required this.onTap});
+  final Map<String, dynamic> event;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    final date = DateTime.tryParse('${event['starts_at']}')?.toLocal();
+    final tickets = event['ticket_count'] ?? 0;
+    return ListTile(
+      minTileHeight: 76,
+      leading: Container(
+        width: 48,
+        height: 52,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: .10),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: date == null
+            ? const Icon(Icons.event_outlined)
+            : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Text(DateFormat('MMM').format(date).toUpperCase(),
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w900)),
+                Text('${date.day}',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w900)),
+              ]),
+      ),
+      title: Text('${event['title'] ?? 'Upcoming event'}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w800)),
+      subtitle: Text(date == null
+          ? '${event['location'] ?? ''}'
+          : '${DateFormat('EEE h:mm a').format(date)} • $tickets tickets'),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: onTap,
+    );
+  }
+}
+
+class _QuickAction extends StatelessWidget {
+  const _QuickAction(
+      {required this.label, required this.icon, required this.onTap});
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: (MediaQuery.sizeOf(context).width - 56) / 2,
+        child: Card(
+          margin: EdgeInsets.zero,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(children: [
+                Icon(icon, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: Text(label,
+                        style: const TextStyle(fontWeight: FontWeight.w800))),
+              ]),
+            ),
+          ),
+        ),
+      );
+}
+
+class _AlertCard extends StatelessWidget {
+  const _AlertCard({required this.alert});
+  final Map<String, dynamic> alert;
   @override
   Widget build(BuildContext context) => Card(
         margin: EdgeInsets.zero,
         child: ListTile(
           leading: const Icon(Icons.warning_amber_rounded, color: kError),
-          title: Text('${alert['source'] ?? 'System'} alert', style: const TextStyle(fontWeight: FontWeight.w800)),
-          subtitle: Text('${alert['message'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis),
-          trailing: Text('×${alert['count'] ?? 1}', style: const TextStyle(color: kError, fontWeight: FontWeight.w800)),
+          title: Text('${alert['source'] ?? 'System'} alert',
+              style: const TextStyle(fontWeight: FontWeight.w800)),
+          subtitle: Text('${alert['message'] ?? ''}',
+              maxLines: 2, overflow: TextOverflow.ellipsis),
+          trailing: Text('×${alert['count'] ?? 1}',
+              style: const TextStyle(
+                  color: kError, fontWeight: FontWeight.w800)),
         ),
       );
-}
-
-class _ActionSection extends StatelessWidget {
-  const _ActionSection({required this.title, required this.icon, required this.color, required this.items, required this.onAction});
-  final String title;
-  final IconData icon;
-  final Color color;
-  final List<Map<String, dynamic>> items;
-  final Future<void> Function(Map<String, dynamic>, bool) onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) return const SizedBox.shrink();
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Column(
-        children: [
-          ListTile(
-            leading: Icon(icon, color: color),
-            title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-            trailing: CircleAvatar(radius: 15, backgroundColor: color.withValues(alpha: .12), child: Text('${items.length}', style: TextStyle(color: color, fontWeight: FontWeight.w800))),
-          ),
-          const Divider(height: 1),
-          ...items.take(5).map((item) => _ActionRow(item: item, color: color, onAction: onAction)),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActionRow extends StatelessWidget {
-  const _ActionRow({required this.item, required this.color, required this.onAction});
-  final Map<String, dynamic> item;
-  final Color color;
-  final Future<void> Function(Map<String, dynamic>, bool) onAction;
-
-  String get title => '${item['business_name'] ?? item['contact_name'] ?? item['name'] ?? item['from_number'] ?? item['caller'] ?? 'New item'}';
-  String get subtitle => '${item['event_type'] ?? item['vendor_type'] ?? item['position'] ?? item['transcription'] ?? item['message'] ?? item['venue'] ?? ''}';
-
-  @override
-  Widget build(BuildContext context) => ListTile(
-        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
-        subtitle: subtitle.isEmpty ? null : Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
-        trailing: Wrap(
-          spacing: 4,
-          children: [
-            IconButton(tooltip: 'Pass', onPressed: () => onAction(item, false), icon: const Icon(Icons.close_rounded)),
-            IconButton(tooltip: 'Approve', onPressed: () => onAction(item, true), icon: Icon(Icons.check_rounded, color: color)),
-          ],
-        ),
-      );
-}
-
-class _UpcomingEvents extends StatelessWidget {
-  const _UpcomingEvents({required this.events});
-  final List<Map<String, dynamic>> events;
-
-  @override
-  Widget build(BuildContext context) {
-    if (events.isEmpty) {
-      return const Card(child: Padding(padding: EdgeInsets.all(18), child: Text('No upcoming events found.')));
-    }
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Column(
-        children: events.map((event) {
-          final parsed = DateTime.tryParse('${event['starts_at']}')?.toLocal();
-          final when = parsed == null ? '' : DateFormat('EEE, MMM d • h:mm a').format(parsed);
-          return ListTile(
-            leading: const Icon(Icons.event_rounded),
-            title: Text('${event['title'] ?? 'Event'}', style: const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text([when, event['location']].where((value) => value != null && '$value'.isNotEmpty).join(' · ')),
-            trailing: event['ticket_count'] == null ? null : Text('${event['ticket_count']} tickets'),
-          );
-        }).toList(),
-      ),
-    );
-  }
 }
 
 class _AllClearCard extends StatelessWidget {
   const _AllClearCard();
-
   @override
   Widget build(BuildContext context) => Card(
         margin: EdgeInsets.zero,
         child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Icon(Icons.check_circle_rounded, color: Theme.of(context).colorScheme.primary, size: 32),
-              const SizedBox(width: 12),
-              const Expanded(child: Text('You are all caught up. There are no outstanding items requiring action.')),
-            ],
-          ),
+          padding: const EdgeInsets.all(22),
+          child: Row(children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: kSuccess.withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: const Icon(Icons.check_rounded, color: kSuccess),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('You are all caught up',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 3),
+                  Text('There are no outstanding items waiting for review.',
+                      style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ]),
+        ),
+      );
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.cloud_off_rounded,
+                size: 46, color: Theme.of(context).colorScheme.error),
+            const SizedBox(height: 14),
+            Text('Could not load the company pulse',
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 6),
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try again'),
+            ),
+          ]),
         ),
       );
 }
