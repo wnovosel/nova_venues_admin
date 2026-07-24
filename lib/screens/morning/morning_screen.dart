@@ -668,6 +668,7 @@ class _AttentionBoard extends StatelessWidget {
     required this.onVendors,
     required this.onVoicemails,
     required this.onHires,
+    required this.onMarketing,
   });
   final List<Map<String, dynamic>> rentals;
   final List<Map<String, dynamic>> vendors;

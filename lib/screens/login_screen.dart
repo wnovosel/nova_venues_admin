@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 import '../models/app_provider.dart';
@@ -15,6 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _auth    = LocalAuthentication();
   bool _obscure  = true;
   bool _canBiometric = false;
+  String? _bioMessage;
 
   @override
   void initState() {
@@ -26,9 +28,20 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final canAuth = await _auth.canCheckBiometrics;
       final isSupported = await _auth.isDeviceSupported();
+      final enrolled = await _auth.getAvailableBiometrics();
+      if (!mounted) return;
       setState(() => _canBiometric = canAuth && isSupported);
-      if (_canBiometric) _tryBiometric();
-    } catch (_) {}
+      if (_canBiometric && enrolled.isNotEmpty) {
+        _tryBiometric();
+      } else if (canAuth && isSupported && enrolled.isEmpty) {
+        // Device supports Face ID but nothing is enrolled — say so instead of
+        // silently doing nothing.
+        setState(() => _bioMessage =
+            'Face ID is available but not set up on this device.');
+      }
+    } catch (e) {
+      if (mounted) setState(() => _bioMessage = 'Face ID unavailable: $e');
+    }
   }
 
   Future<void> _tryBiometric() async {
@@ -37,12 +50,33 @@ class _LoginScreenState extends State<LoginScreen> {
         localizedReason: 'Sign in to Nova Venues Admin',
         options: const AuthenticationOptions(biometricOnly: true, stickyAuth: true),
       );
-      if (authenticated && mounted) {
-        final provider = context.read<AppProvider>();
-        // Restore existing session — biometric just unlocks it
-        await provider.restoreAndValidate();
+      if (!authenticated || !mounted) return;
+      final provider = context.read<AppProvider>();
+      // Face ID does NOT log in — it unlocks a STORED session. If the saved
+      // refresh token is gone or expired (long gap, logout, reinstall), the
+      // restore silently does nothing and the user is left staring at the
+      // login screen after a "successful" scan. Tell them to sign in once.
+      await provider.restoreAndValidate();
+      if (!mounted) return;
+      if (!provider.loggedIn) {
+        setState(() => _bioMessage =
+            'Your saved session expired. Sign in with your password once to re-enable Face ID.');
       }
-    } catch (_) {}
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      // The common real-world cases, named rather than swallowed.
+      final msg = switch (e.code) {
+        'NotEnrolled' => 'No Face ID enrolled on this device.',
+        'NotAvailable' => 'Face ID is not available. Check Settings → Face ID.',
+        'LockedOut' || 'PermanentlyLockedOut' =>
+          'Face ID is locked after too many attempts. Use your passcode, then try again.',
+        'PasscodeNotSet' => 'Set a device passcode to use Face ID.',
+        _ => 'Face ID failed (${e.code}).',
+      };
+      setState(() => _bioMessage = msg);
+    } catch (e) {
+      if (mounted) setState(() => _bioMessage = 'Face ID failed: $e');
+    }
   }
 
   @override
@@ -158,6 +192,19 @@ class _LoginScreenState extends State<LoginScreen> {
                     const Text('Sign in with Face ID',
                         style: TextStyle(color: NovaColors.fallbackPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
                   ]),
+                ),
+
+              // Why Face ID didn't work — previously every failure was
+              // swallowed by an empty catch, so it just appeared broken.
+              if (_bioMessage != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(
+                    _bioMessage!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        color: NovaColors.darkMuted, fontSize: 12, height: 1.4),
+                  ),
                 ),
 
               const SizedBox(height: 20),
