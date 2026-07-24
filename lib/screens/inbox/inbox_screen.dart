@@ -6,6 +6,7 @@ import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart
 import 'package:fwfh_cached_network_image/fwfh_cached_network_image.dart';
 import '../../models/app_provider.dart';
 import '../../theme/app_theme.dart';
+import '../phone/voicemail_sheet.dart';
 
 // ── Swipe action config ───────────────────────────────────────────────────────
 
@@ -52,7 +53,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 3, vsync: this);
+    _tabs = TabController(length: 5, vsync: this);
     _load();
   }
 
@@ -136,6 +137,11 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
     // "Messages" = left messages / leads awaiting a human (contact_submissions).
     // Bot chat transcripts live in the web chat hub, not the inbox.
     final messages = (_data['messages'] as List? ?? []).cast<Map<String, dynamic>>();
+    // Backend returns five categories; voicemails + chats were fetched and
+    // discarded before — the app only rendered three tabs.
+    final voicemails = (_data['voicemails'] as List? ?? []).cast<Map<String, dynamic>>();
+    final chats = (_data['chats'] as List? ?? []).cast<Map<String, dynamic>>();
+    final unheard = voicemails.where((v) => v['voicemail_heard'] != true).length;
     final unhandled = messages.where((m) => m['handled_at'] == null).length;
 
     return Scaffold(
@@ -153,6 +159,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
         ],
         bottom: TabBar(
           controller: _tabs,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           labelColor: kPrimary,
           unselectedLabelColor: kTextMuted,
           indicatorColor: kPrimary,
@@ -160,8 +168,10 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
           labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           tabs: [
             Tab(text: 'Email${_emails.isEmpty ? '' : ' (${_emails.length})'}'),
-            Tab(text: 'Calls${calls.isEmpty ? '' : ' (${calls.length})'}'),
             Tab(text: 'Messages${unhandled == 0 ? '' : ' ($unhandled)'}'),
+            Tab(text: 'Voicemails${unheard == 0 ? '' : ' ($unheard)'}'),
+            Tab(text: 'Calls${calls.isEmpty ? '' : ' (${calls.length})'}'),
+            Tab(text: 'Chats${chats.isEmpty ? '' : ' (${chats.length})'}'),
           ],
         ),
       ),
@@ -179,8 +189,10 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                       onSwipe: _handleSwipeAction,
                       onRefresh: _load,
                     ),
-                    _CallList(calls: calls, onChanged: _load),
                     _MessageList(messages: messages, onChanged: _load),
+                    _VoicemailList(voicemails: voicemails, onChanged: _load),
+                    _CallList(calls: calls, onChanged: _load),
+                    _ChatList(chats: chats),
                   ],
                 ),
     );
@@ -1234,4 +1246,229 @@ String _formatDate(dynamic val) {
     if (now.difference(dt).inDays < 7) return DateFormat('EEE').format(dt);
     return DateFormat('MMM d').format(dt);
   } catch (_) { return ''; }
+}
+
+// ── Voicemails ───────────────────────────────────────────────────────────────
+// Walt's 07-23 ruling: this tab is recordings ONLY. Everything else
+// phone-shaped (substantive calls + phone leads) lives in the Calls tab.
+
+class _VoicemailList extends StatelessWidget {
+  final List<Map<String, dynamic>> voicemails;
+  final VoidCallback onChanged;
+  const _VoicemailList({required this.voicemails, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    if (voicemails.isEmpty) {
+      return const _EmptyTab(
+          icon: Icons.voicemail_outlined, label: 'No voicemails');
+    }
+    return RefreshIndicator(
+      onRefresh: () async => onChanged(),
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemCount: voicemails.length,
+        separatorBuilder: (_, __) => const Divider(height: 1, indent: 68),
+        itemBuilder: (context, i) {
+          final v = voicemails[i];
+          final heard = v['voicemail_heard'] == true;
+          final who = (v['caller_name'] ?? v['from_number'] ?? 'Unknown caller')
+              .toString();
+          final preview =
+              (v['voicemail_transcript'] ?? v['summary'] ?? '').toString().trim();
+          return ListTile(
+            leading: CircleAvatar(
+              backgroundColor:
+                  (heard ? kTextMuted : kError).withValues(alpha: .12),
+              child: Icon(Icons.voicemail,
+                  color: heard ? kTextMuted : kError, size: 20),
+            ),
+            title: Text(who,
+                style: TextStyle(
+                    fontWeight: heard ? FontWeight.w600 : FontWeight.w800,
+                    color: kTextDark)),
+            subtitle: Text(
+                preview.isEmpty ? 'Tap to listen' : preview,
+                maxLines: 2, overflow: TextOverflow.ellipsis),
+            trailing: const Icon(Icons.play_circle_outline, color: kPrimary),
+            // Reuses the player sheet: listen + full transcript.
+            onTap: () => showVoicemailSheet(context, {
+              ...v,
+              'recording_url': v['voicemail_url'],
+            }),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ── Chats ────────────────────────────────────────────────────────────────────
+// Website chat sessions. Added to the inbox on 07-17 after Walt looked for
+// them here and found nothing.
+
+class _ChatList extends StatelessWidget {
+  final List<Map<String, dynamic>> chats;
+  const _ChatList({required this.chats});
+
+  @override
+  Widget build(BuildContext context) {
+    if (chats.isEmpty) {
+      return const _EmptyTab(
+          icon: Icons.forum_outlined, label: 'No website chats');
+    }
+    return ListView.separated(
+      itemCount: chats.length,
+      separatorBuilder: (_, __) => const Divider(height: 1, indent: 68),
+      itemBuilder: (context, i) {
+        final c = chats[i];
+        final who = (c['visitor_name'] ??
+                c['visitor_email'] ??
+                c['visitor_domain'] ??
+                'Website visitor')
+            .toString();
+        final count = c['message_count'] ?? 0;
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundColor: kPrimary.withValues(alpha: .12),
+            child: const Icon(Icons.forum_outlined, color: kPrimary, size: 20),
+          ),
+          title: Text(who,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w700, color: kTextDark)),
+          subtitle: Text((c['last_message'] ?? '').toString(),
+              maxLines: 2, overflow: TextOverflow.ellipsis),
+          trailing: Text('$count',
+              style: const TextStyle(fontSize: 12, color: kTextMuted)),
+          onTap: () {
+            final sid = (c['session_id'] ?? '').toString();
+            if (sid.isEmpty) return;
+            Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => _ChatThreadScreen(
+                        sessionId: sid, title: who)));
+          },
+        );
+      },
+    );
+  }
+}
+
+class _ChatThreadScreen extends StatefulWidget {
+  final String sessionId;
+  final String title;
+  const _ChatThreadScreen({required this.sessionId, required this.title});
+
+  @override
+  State<_ChatThreadScreen> createState() => _ChatThreadScreenState();
+}
+
+class _ChatThreadScreenState extends State<_ChatThreadScreen> {
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _messages = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final res = await context
+          .read<AppProvider>()
+          .api
+          .getChatSession(widget.sessionId);
+      if (!mounted) return;
+      setState(() {
+        _messages = (res['messages'] as List? ?? const [])
+            .whereType<Map>()
+            .map((e) => e.cast<String, dynamic>())
+            .toList();
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceFirst('ApiException: ', '');
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: kBackground,
+      appBar: AppBar(title: Text(widget.title)),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: kPrimary))
+          : _error != null
+              ? Center(
+                  child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(_error!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: kError)),
+                ))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(14),
+                  itemCount: _messages.length,
+                  itemBuilder: (context, i) {
+                    final m = _messages[i];
+                    final role =
+                        (m['role'] ?? m['type'] ?? '').toString().toLowerCase();
+                    final isVisitor = role == 'user' || role == 'visitor';
+                    return Align(
+                      alignment: isVisitor
+                          ? Alignment.centerLeft
+                          : Alignment.centerRight,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        constraints: BoxConstraints(
+                            maxWidth:
+                                MediaQuery.of(context).size.width * .78),
+                        decoration: BoxDecoration(
+                          color: isVisitor ? kSurface : kPrimary,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                              color: isVisitor ? kBorder : kPrimary),
+                        ),
+                        child: Text(
+                          (m['body'] ?? '').toString(),
+                          style: TextStyle(
+                              fontSize: 14,
+                              height: 1.4,
+                              color: isVisitor ? kTextDark : Colors.white),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+    );
+  }
+}
+
+class _EmptyTab extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _EmptyTab({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 44, color: kTextMuted),
+          const SizedBox(height: 10),
+          Text(label, style: const TextStyle(color: kTextMuted)),
+        ],
+      ),
+    );
+  }
 }

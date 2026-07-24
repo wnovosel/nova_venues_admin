@@ -159,6 +159,10 @@ class AdminApiClient {
   Future<Map<String, dynamic>> markVoicemailHeard(String callSid) =>
       _post('/api/v1/admin-inbox/voicemail/$callSid/heard', {});
 
+  /// Full transcript for a website chat session (Chats tab).
+  Future<Map<String, dynamic>> getChatSession(String sessionId) =>
+      _get('/api/v1/admin-inbox/chat/${Uri.encodeComponent(sessionId)}');
+
   Future<Map<String, dynamic>> composeEmail(String to, String subject, String body) =>
       _post('/api/v1/admin-inbox/compose', {'to': to, 'subject': subject, 'body': body});
 
